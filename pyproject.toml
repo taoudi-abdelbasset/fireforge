@@ -1,0 +1,182 @@
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[project]
+name = "fireforge"
+version = "0.0.0"
+description = "A forge for External API, builds library from external API specifications."
+readme = "README.md"
+license = { text = "Proprietary" }
+authors = [
+    { name = "Firethunder", email = "dev@firethunder.ma" },
+    { name = "Abdelbasset Taoudi", email = "taoudiabdelbasset.contact@gmail.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.11,<4.0"
+
+dependencies = ["jsonschema (>=4.25.1,<5.0.0)", "requests (>=2.32.5,<3.0.0)"]
+
+[project.optional-dependencies]
+cli = ["jinja2 (>=3.1.6,<4.0.0)", "click (>=8.1.0,<8.2.0)"]
+
+[[tool.poetry.include]]
+path = "resources"
+
+[tool.setuptools]
+packages = ["fireforge"]
+
+[tool.poetry.group.dev.dependencies]
+autoflake = "^2.3.1"
+isort = "^6.0.1"
+black = "^25.1.0"
+pylint = "^3.3.8"
+taskipy = "^1.14.1"
+pre-commit = "^4.3.0"
+gitlint = "^0.19.1"
+python-semantic-release = "^10.4.1"
+
+[project.scripts]
+forge-cli = "fireforge.cli:run"
+
+[tool.autoflake]
+check = false
+in-place = true
+recursive = true
+exclude = [".venv/*"]
+imports = ["jinja2", "requests", "jsonschema", "colour"]
+
+
+[tool.isort]
+multi_line_output = 3
+line_length = 120
+include_trailing_comma = true
+force_alphabetical_sort_within_sections = true
+overwrite_in_place = true
+combine_star = true
+star_first = true
+verbose = true
+
+
+[tool.black]
+line-length = 120
+
+[tool.pylint.main]
+recursive = true
+ignore = [".venv"]
+ignore-patterns = ["fixtures.py", "conftest.py", ".*_tests.py"]
+fail-under = 9.5
+fail-on = [
+    # all fatal-errors
+    "F",
+    #all errors
+    "E",
+    "C0209", # consider-using-f-string
+    "R0205", # useless-object-inheritance
+    "R0401", # cyclic-import
+    "R1725", # super-with-arguments
+    "R1734", # use-list-literal
+    "R1735", # use-dict-literal
+    "W0102", # dangerous-default-value
+    "W0133", # pointless-exception-statement
+    "W0223", # abstract-method
+    "W0401", # wildcard-import
+    "W0611", # unused-import
+    "W0612", # unused-variable
+    "W0622", # redefined-builtin
+    "W0707", # raise-missing-from
+    "W0718", # broad-exception-caught
+    "W0719", # broad-exception-raised
+    "W1113", # keyword-arg-before-vararg
+    "W1114", # arguments-out-of-order
+    "W1203", # logging-fstring-interpolation
+    "W1309", # f-string-without-interpolation
+    "W1510", # subprocess-run-check
+]
+enable = ["bad-inline-option", "useless-suppression", "deprecated-pragma"]
+disable = [
+    'F0002', # astroid-error, pylint issues not ours
+    # docstings
+    'C0114',
+    'C0115',
+    'C0116',
+    'C0411', # import order
+    'C0415', # non top-level-imports
+    'W0221', # arguments-differ between a class and its parent
+    # 'E1101', # no-member → need a solution see https://github.com/pylint-dev/pylint/issues/1162
+    'E0611', # no-name-in-module
+]
+
+[tool.pylint.format]
+max-line-length = "120"
+good-names = ["id", "pk", "_", "registry"]
+
+[tool.pylint.design]
+max-args = 8
+max-attributes = 12
+max-bool-expr = 5
+max-public-methods = 30
+max-returns = 12
+min-public-methods = 0
+max-parents = 15
+max-positional-arguments = 5
+
+[tool.pylint.variables]
+ignored-argument-names = "_|arg|args|kwargs|context"
+
+# [tool.pytest.ini_options]
+# python_files = "*_tests.py"
+# addopts = "--print -p ft_core.testings.plugin --ignore=.venv"
+# filterwarnings = [
+#     "error::RuntimeWarning",
+#     "error::_pytest.warning_types.PytestUnknownMarkWarning",
+#     "ignore::DeprecationWarning"
+# ]
+
+[tool.semantic_release]
+allow_zero_version = true
+major_on_zero = false
+commit_message = "chore: semantic-release generated {version}"
+commit_parser = "conventional"
+tag_format = "{version}"
+version_toml = ["pyproject.toml:project.version"]
+version_variables = ["cli/__init__.py:__version__"]
+
+[tool.semantic_release.remote]
+type = "gitlab"
+domain = "https://git.internal.selfip.com"
+
+[tool.semantic_release.branches.release]
+match = "(release)"
+prerelease_token = ""
+prerelease = false
+
+[tool.semantic_release.branches.main]
+match = "(main)"
+prerelease_token = "rc"
+prerelease = true
+
+[tool.semantic_release.branches.dev-proctected]
+match = "(dev/.*)"
+prerelease_token = "alpha"
+prerelease = true
+
+[tool.semantic_release.commit_parser_options]
+allowed_tags = [
+    "build",
+    "chore",
+    "ci",
+    "docs",
+    "feat",
+    "fix",
+    "perf",
+    "style",
+    "refactor",
+    "test",
+]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf"]

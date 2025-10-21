@@ -1,0 +1,20 @@
+[general]
+ignore = B6
+contrib = CT1
+
+### RULE CONFIGURATION ###
+[title-max-length]
+line-length=120
+
+[title-min-length]
+min-length=15
+
+[body-max-line-length]
+line-length=500
+
+[body-min-length]
+min-length=0
+
+# Setting contrib rule options is identical to configuring other rules
+[contrib-title-conventional-commits]
+types = fix,feat,chore,docs,style,refactor,perf,test,revert,ci,build
