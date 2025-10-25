@@ -1,0 +1,321 @@
+{
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": [
+        "api_name",
+        "base_url",
+        "versions"
+    ],
+    "properties": {
+        "api_name": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "base_url": {
+            "type": "string",
+            "pattern": "^\\$\\{[A-Z0-9_]+:[^\\s]+\\}$|^https?://[^\\s]+$"
+        },
+        "default_version": {
+            "type": "string"
+        },
+        "timeout": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 30
+        },
+        "raise_on_error": {
+            "type": "boolean",
+            "default": true
+        },
+        "retry": {
+            "$ref": "#/$defs/retry"
+        },
+        "auth": {
+            "type": [
+                "object",
+                "null"
+            ],
+            "default": null,
+            "oneOf": [
+                {
+                    "type": "null"
+                },
+                {
+                    "type": "object",
+                    "properties": {
+                        "type": {
+                            "type": "string",
+                            "enum": [
+                                "login_token",
+                                "static_token"
+                            ]
+                        },
+                        "login_endpoint": {
+                            "type": "object",
+                            "properties": {
+                                "path": {
+                                    "type": "string",
+                                    "pattern": "^[^\\s]+$"
+                                },
+                                "method": {
+                                    "type": "string",
+                                    "enum": [
+                                        "POST",
+                                        "GET",
+                                        "PUT",
+                                        "DELETE",
+                                        "PATCH"
+                                    ]
+                                },
+                                "login_body": {
+                                    "$ref": "https://json-schema.org/draft/2020-12/schema"
+                                },
+                                "token_field": {
+                                    "type": "string"
+                                },
+                                "refresh_token_field": {
+                                    "type": "string"
+                                },
+                                "expires_in_field": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "path",
+                                "method",
+                                "token_field"
+                            ],
+                            "additionalProperties": false
+                        },
+                        "refresh_endpoint": {
+                            "type": "object",
+                            "properties": {
+                                "path": {
+                                    "type": "string",
+                                    "pattern": "^[^\\s]+$"
+                                },
+                                "method": {
+                                    "type": "string",
+                                    "enum": [
+                                        "POST",
+                                        "GET",
+                                        "PUT",
+                                        "DELETE",
+                                        "PATCH"
+                                    ]
+                                },
+                                "body_schema": {
+                                    "$ref": "https://json-schema.org/draft/2020-12/schema"
+                                }
+                            },
+                            "required": [
+                                "path",
+                                "method",
+                                "body_schema"
+                            ],
+                            "additionalProperties": false
+                        },
+                        "access_key": {
+                            "type": "string"
+                        },
+                        "token_placement": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": [
+                                        "header",
+                                        "query",
+                                        "body"
+                                    ],
+                                    "default": "header"
+                                },
+                                "prefix": {
+                                    "type": "string"
+                                },
+                                "token_field_name": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": false,
+                            "required": [
+                                "token_field_name"
+                            ]
+                        }
+                    },
+                    "required": [
+                        "type",
+                        "token_placement"
+                    ],
+                    "allOf": [
+                        {
+                            "if": {
+                                "properties": {
+                                    "type": {
+                                        "const": "login_token"
+                                    }
+                                }
+                            },
+                            "then": {
+                                "required": [
+                                    "login_endpoint"
+                                ]
+                            }
+                        },
+                        {
+                            "if": {
+                                "properties": {
+                                    "type": {
+                                        "const": "static_token"
+                                    }
+                                }
+                            },
+                            "then": {
+                                "required": [
+                                    "access_key"
+                                ]
+                            }
+                        }
+                    ],
+                    "additionalProperties": false
+                }
+            ]
+        },
+        "versions": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": {
+                "properties": {
+                    "version_name": {}
+                }
+            },
+            "items": {
+                "type": "object",
+                "required": [
+                    "version_name",
+                    "endpoints"
+                ],
+                "properties": {
+                    "version_name": {
+                        "type": "string",
+                        "pattern": "^[a-zA-Z0-9_-]+$"
+                    },
+                    "endpoints": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": {
+                            "properties": {
+                                "function_name": {}
+                            }
+                        },
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "function_name",
+                                "path",
+                                "method"
+                            ],
+                            "properties": {
+                                "function_name": {
+                                    "type": "string",
+                                    "pattern": "^[a-zA-Z0-9_-]+$"
+                                },
+                                "path": {
+                                    "type": "string",
+                                    "pattern": "^/[^\\s]*(?:\\{[a-zA-Z0-9_-]+\\}[^\\s]*)*$"
+                                },
+                                "method": {
+                                    "type": "string",
+                                    "enum": [
+                                        "GET",
+                                        "POST",
+                                        "PUT",
+                                        "DELETE",
+                                        "PATCH"
+                                    ]
+                                },
+                                "auth_required": {
+                                    "type": "boolean",
+                                    "default": true
+                                },
+                                "body_required": {
+                                    "type": "boolean",
+                                    "default": false
+                                },
+                                "params_schema": {
+                                    "$ref": "https://json-schema.org/draft/2020-12/schema"
+                                },
+                                "raise_on_error": {
+                                    "type": "boolean",
+                                    "default": true
+                                },
+                                "timeout": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "retry": {
+                                    "$ref": "#/$defs/retry"
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    }
+                },
+                "additionalProperties": false
+            }
+        }
+    },
+    "if": {
+        "properties": {
+            "default_version": {
+                "type": "string"
+            }
+        },
+        "required": [
+            "default_version"
+        ]
+    },
+    "then": {
+        "properties": {
+            "versions": {
+                "contains": {
+                    "properties": {
+                        "version_name": {
+                            "const": {
+                                "$data": "1/default_version"
+                            }
+                        }
+                    },
+                    "required": [
+                        "version_name"
+                    ]
+                }
+            }
+        }
+    },
+    "additionalProperties": false,
+    "$defs": {
+        "retry": {
+            "type": "object",
+            "properties": {
+                "attempts": {
+                    "type": "integer",
+                    "default": 3
+                },
+                "delay": {
+                    "type": "number",
+                    "default": 1.0
+                },
+                "backoff_factor": {
+                    "type": "number",
+                    "default": 2.0
+                },
+                "jitter": {
+                    "type": "boolean",
+                    "default": true
+                }
+            },
+            "additionalProperties": false
+        }
+    }
+}
