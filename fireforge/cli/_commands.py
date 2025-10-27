@@ -36,8 +36,8 @@ def validate_json_schema(data: Dict[Any, Any], schema: Dict[Any, Any]) -> List[D
     Validate data against JSON schema
     """
     validator = jsonschema.Draft7Validator(schema)
-    
-    return [
+
+    errors = [
         {
             "path": " -> ".join(map(str, e.path)),
             "message": e.message,
@@ -45,6 +45,17 @@ def validate_json_schema(data: Dict[Any, Any], schema: Dict[Any, Any]) -> List[D
         }
         for e in validator.iter_errors(data)
     ]
+
+    if "default_version" in data and data.get("default_version"):
+        version_names = [v["version_name"] for v in data.get("versions", [])]
+        if data["default_version"] not in version_names:
+            errors.append({
+                "path": "default_version",
+                "message": "No default version found in versions available",
+                "value": data["default_version"]
+            })
+
+    return errors
 
 def validate_config_file(config_file: Path, verbose: bool = True):
     """
@@ -76,8 +87,7 @@ def generate_command(config_files, output_dir, library_name):
     """
     validate, then generate codebase from config_files
     """
-    # TODO: implement
-    raise NotImplementedError
+    pass
 
 
 @click.command("validate", help="Validate JSON config files against the library schema")

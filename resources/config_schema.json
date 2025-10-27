@@ -265,34 +265,6 @@
             }
         }
     },
-    "if": {
-        "properties": {
-            "default_version": {
-                "type": "string"
-            }
-        },
-        "required": [
-            "default_version"
-        ]
-    },
-    "then": {
-        "properties": {
-            "versions": {
-                "contains": {
-                    "properties": {
-                        "version_name": {
-                            "const": {
-                                "$data": "1/default_version"
-                            }
-                        }
-                    },
-                    "required": [
-                        "version_name"
-                    ]
-                }
-            }
-        }
-    },
     "additionalProperties": false,
     "$defs": {
         "retry": {
