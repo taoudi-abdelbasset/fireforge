@@ -5,6 +5,7 @@ import ujson
 import jsonschema
 
 from ..consts import BASE_DIR
+from ..generators import GeneratorContext,LibraryGenerator
 
 import click
 
@@ -83,12 +84,62 @@ def validate_config_file(config_file: Path, verbose: bool = True):
     "output_dir", type=click.Path(file_okay=False, writable=True, path_type=Path)
 )
 @click.option("--library-name", default="", help="Name of the generated library")
-def generate_command(config_files, output_dir, library_name):
+@click.option("-f","--force", is_flag=True)
+def generate_command(config_files, output_dir, library_name,force):
     """
     validate, then generate codebase from config_files
     """
-    pass
+    
+    if not config_files:
+        raise click.ClickException("Please provide at least one JSON file to validate.")
 
+    all_files = []
+    for path in config_files:
+        if path.is_dir():
+            # Get all JSON files in the directory (non-recursive)
+            all_files.extend(path.glob("*.json"))
+        else:
+            all_files.append(path)
+
+    if not all_files:
+        raise click.ClickException("No JSON files found to validate.")
+    
+    for file in all_files:
+        # in case is forced
+        if force:
+            data = load_json_file(file)
+        else:
+            data, _ = validate_config_file(file)
+
+        # Skip if data is unvalidated json & not Forced
+        if data is None:
+            continue
+
+        api_name = data.get("api_name")
+
+        click.echo(f"Starting library generation from {file}")
+        click.echo(f"Output directory: {output_dir}")
+        click.echo(f"Library name: {library_name}")
+        click.echo(f"API: {api_name}")
+
+        try:
+            # Create GeneratorContext
+            gen_context = GeneratorContext.create(
+                config=data,
+                output_dir=output_dir
+            )
+
+            # Instantiate LibraryGenerator
+            lib_generator = LibraryGenerator()
+
+            # Run the library generation
+            result = lib_generator.generate_library(gen_context)
+
+            click.echo(f"Successfully generated library '{result['library_name']}' "
+                    f"with {result['total_files']} files in {result['output_dir']}")
+        except Exception as e:
+            click.echo(f"Error generating library: {str(e)}", err=True)
+            raise click.ClickException(f"Failed to generate library: {str(e)}")
 
 @click.command("validate", help="Validate JSON config files against the library schema")
 @click.argument(
