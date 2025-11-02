@@ -126,7 +126,8 @@ def generate_command(config_files, output_dir, library_name,force):
             # Create GeneratorContext
             gen_context = GeneratorContext.create(
                 config=data,
-                output_dir=output_dir
+                output_dir=output_dir,
+                lib_name = library_name
             )
 
             # Instantiate LibraryGenerator
