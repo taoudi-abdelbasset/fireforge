@@ -119,29 +119,25 @@ class LibraryGenerator:
         context: GeneratorContext
     ):
         """Generate complete library RestAPI"""
-        pass
         
-        # Available generators
+        # Available generators        
         available_generators = {
             "clients": ClientsGenerator
         }
-        
         # Generate code
         results = {
             'api_name': context.api_name,
             'library_name': context.lib_name,
             'output_dir': str(context.output_dir),
-            'generators':{},
+            'generators': {},
             'total_files': 0
         }
-        
         for gen_name in available_generators:
-            # gicing context to each generator
+            # Giving context to each generator
             generator = available_generators[gen_name](context)
-            files = generator.generate()
-            
+            generated_files = list(generator.generate())
             results['generators'][gen_name] = {
-                'files': files
+                'files': generated_files 
             }
-        
+            results['total_files'] += len(generated_files)  # Update total file count
         return results
