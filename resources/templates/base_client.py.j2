@@ -2,7 +2,7 @@
 # THIS FILE IS GENERATED — DO NOT EDIT
 #
 # This Python file was automatically generated for 
-#     {{ api_name | title }} API Base Client.
+#     {{ api_name | _parts }} API Base Client.
 #
 #
 # Generated on: {{ now().strftime("%Y-%m-%dT%H:%M:%SZ") }}
@@ -11,4 +11,34 @@
 """
 @TODO put the code of the base client class, previously named "api_base_template.py.j2"
 """
+from fireforge.core import StaticBaseApiClient,BaseAuth
+from typing import Optional, Dict, Any, Union, List, ClassVar
+
+{% if config.auth %}
+class {{ api_name | pascal_case }}{{ config.auth.type | pascal_case }}Auth(BaseAuth._registry["{{ config.auth.type }}"]):
+    """{{ config.auth.type }} authentication handler for {{ api_name }} API"""
+    auth_config: ClassVar[Dict[str, Any]] = {{ config.auth | tojson if config.auth else '{}' }}
+    base_url: ClassVar[str] = "{{ config.base_url }}"
+{% endif %}
+
+class {{ base_client_class_name }}(StaticBaseApiClient):
+    """Base client for {{ api_name | _parts }} API with shared configuration"""
+    
+    api_name: ClassVar[str] = "{{ api_name }}"
+    api_config: ClassVar[Dict[str, Any]] = {
+        "base_url": "{{ config.base_url }}",
+        "timeout": {{ config.timeout | default(30) }},
+        "raise_on_error": {{ config.raise_on_error | default(true) | _parts }},
+        {% if config.retry %}
+        "retry": {
+            "attempts": {{ config.retry.attempts | default(3) }},
+            "delay": {{ config.retry.delay | default(1.0) }},
+            "backoff_factor": {{ config.retry.backoff_factor | default(2.0) }},
+            "jitter": {{ config.retry.jitter | default(true) | _parts }}
+        }{% endif %}
+    }
+
+    {% if config.auth %}
+    auth_handler = {{ api_name | pascal_case }}{{ config.auth.type | pascal_case }}Auth
+    {% endif %}
 
