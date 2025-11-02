@@ -12,9 +12,10 @@ class GeneratorContext:
         self.lib_name = lib_name
 
     @classmethod
-    def create(cls, config: Dict[str, Any], output_dir: str) -> 'GeneratorContext':
+    def create(cls, config: Dict[str, Any], output_dir: str,lib_name:str) -> 'GeneratorContext':
         return cls(
             config=config,
+            lib_name=lib_name if lib_name else "Fireforge-Lib",
             api_name=config.get("api_name","api_name"),
             output_dir=Path(output_dir)
         )
