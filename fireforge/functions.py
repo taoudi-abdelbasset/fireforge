@@ -1,4 +1,7 @@
 import re
+import os
+from typing import Dict, Any
+from .consts import _DOTENV_PLACEHOLDER_PATTERN
 
 __all__ = ["to_snake_case", "to_pascal_case"]
 
@@ -32,3 +35,25 @@ def to_snake_case(value: str) -> str:
 
 def to_pascal_case(value: str) -> str:
     return "".join(part.capitalize() for part in _parts(value))
+
+def parse_config(config: Any) -> Any:
+    """
+    Parse value with ${VAR:default} or ${VAR} syntax (original interface).
+    """    
+    # If input is a dictionary, process it recursively
+    if isinstance(config, dict):
+        return {key: parse_config(value) for key, value in config.items()}
+    
+    # If input is a list, process each item
+    elif isinstance(config, list):
+        return [parse_config(item) for item in config]
+    
+    # If input is a string, parse ${VAR:default} or ${VAR} patterns
+    elif isinstance(config, str):        
+        def replace_match(match):
+            var_name = match.group(1)  # The variable name
+            default = match.group(2)   # The default value (if any)
+            return os.getenv(var_name, default if default is not None else "")
+        
+        return re.sub(_DOTENV_PLACEHOLDER_PATTERN, replace_match, config)
+    return config
