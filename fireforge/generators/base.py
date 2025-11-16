@@ -1,18 +1,18 @@
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 from jinja2 import Environment, FileSystemLoader
-from ..functions import to_pascal_case ,to_snake_case,_parts
+from ..functions import to_pascal_case ,to_snake_case
 import datetime
 
 class GeneratorContext:
-    def __init__(self, config: Dict[str, Any], api_name: str, output_dir: Path,lib_name: str = "FireForge-Library" ):
+    def __init__(self, config: dict[str, Any], api_name: str, output_dir: Path,lib_name: str = "FireForge-Library" ):
         self.config = config
         self.api_name = api_name
         self.output_dir = output_dir
         self.lib_name = lib_name
 
     @classmethod
-    def create(cls, config: Dict[str, Any], output_dir: str,lib_name:str) -> 'GeneratorContext':
+    def create(cls, config: dict[str, Any], output_dir: str,lib_name:str) -> 'GeneratorContext':
         return cls(
             config=config,
             lib_name=lib_name if lib_name else "Fireforge-Lib",
@@ -34,7 +34,6 @@ class BaseGenerator:
         self.jinja_env.filters['snake_case'] = to_snake_case
         self.jinja_env.filters['pascal_case'] = to_pascal_case
         self.jinja_env.globals['now'] = datetime.datetime.now
-        self.jinja_env.filters['_parts'] = _parts
     
     def render_template(self, template_name: str, **kwargs) -> str:
         """Render template with context"""
@@ -45,7 +44,7 @@ class BaseGenerator:
             **kwargs
         )
     
-    def save_file(self, content: str, file_path: Path) -> Dict[str, Any]:
+    def save_file(self, content: str, file_path: Path) -> dict[str, Any]:
         """Save file and return info"""
         Path(file_path).parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, 'w', encoding='utf-8') as f:

@@ -1,0 +1,9 @@
+"""
+API version clients for {{ api_name }}
+"""
+{%- for version_name, class_name in client_classes %}
+
+from .{{ version_name }} import {{ class_name }}
+{%- endfor %}
+
+__all__ = [{{ client_classes|map(attribute='1')|map('tojson')|join(', ') }}]

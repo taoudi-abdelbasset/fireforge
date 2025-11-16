@@ -2,7 +2,7 @@
 # THIS FILE IS GENERATED — DO NOT EDIT
 #
 # This Python file was automatically generated for 
-#     {{ api_name | _parts }} API version {{ version_name }}.
+#     {{ api_name }} API version {{ version_name }}.
 #
 #
 # Generated on: {{ now().strftime("%Y-%m-%dT%H:%M:%SZ") }}
@@ -13,10 +13,10 @@
 """
 from ..base import {{ base_client_class_name }}
 from fireforge.core import endpoint
-from typing import Optional, Dict, Any, Union, List, ClassVar
+from typing import Any, ClassVar
 
 class {{ client_class_name }}({{ base_client_class_name }}):
-    """{{ api_name | _parts }} API {{ version_name | upper }} client"""
+    """{{ api_name }} API {{ version_name | upper }} client"""
     
     version = "{{ version_config.version_name }}"
     
@@ -39,19 +39,19 @@ class {{ client_class_name }}({{ base_client_class_name }}):
         {% endfor %}
         {% endif %}
         {% if endpoint_config.body_schema %}
-        body: Optional[Dict[str, Any]] = None,
+        body: dict[str, Any] | None = None,
         {% endif %}
-        params: Optional[Dict[str, Any]] = None, 
-        headers: Optional[Dict[str,str]] = None,
+        params: dict[str, Any] | None = None, 
+        headers: dict[str,str] | None = None,
         **kwargs
     ):
-        """{{ endpoint_config.function_name | replace('_', ' ') | _parts }}
+        """{{ endpoint_config.function_name | replace('_', ' ') }}
 
         {{ endpoint_config.get('description', 'Generated endpoint method for ' + endpoint_config.function_name) }}
         
         Method: {{ endpoint_config.method }}
         Path: {{ endpoint_config.path }}
-        Auth Required: {{ endpoint_config.auth_required | default(false) | _parts }}
+        Auth Required: {{ endpoint_config.auth_required | default(false) }}
         {% if endpoint_config.body_required %}
         Body Required: {{ endpoint_config.body_required }}
         {% endif %}
@@ -72,7 +72,7 @@ class {{ client_class_name }}({{ base_client_class_name }}):
         {% if endpoint_config.response_schema %}
             {{ endpoint_config.function_name | pascal_case }}Response: Parsed response object
         {% else %}
-            Dict[str, Any]: Raw response data
+            dict[str, Any]: Raw response data
         {% endif %}
 
         Raises:

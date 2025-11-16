@@ -1,6 +1,6 @@
 from pathlib import Path
 import os
-from typing import Dict, Any, Union,List, Optional
+from typing import Any,ClassVar
 import ujson
 import jsonschema
 
@@ -10,7 +10,7 @@ from ..generators import GeneratorContext,LibraryGenerator
 import click
 
 # Load json file with Exeption
-def load_json_file(file_path: Union[str, Path]) -> Dict[Any, Any]:
+def load_json_file(file_path: str | Path) -> dict[str, Any]:
     """
     Load and parse JSON file with error handling
     """    
@@ -21,7 +21,7 @@ def load_json_file(file_path: Union[str, Path]) -> Dict[Any, Any]:
         raise Exception(f"Error reading {file_path}: {e}")
 
 # Save json file
-def save_json_file(data: Dict[Any, Any], file_path: Union[str, Path], indent: int = 2):
+def save_json_file(data: dict[str, Any], file_path: str | Path, indent: int = 2):
     """
     Save data to JSON file with error handling
     """    
@@ -32,7 +32,7 @@ def save_json_file(data: Dict[Any, Any], file_path: Union[str, Path], indent: in
     except Exception as e:
         raise Exception(f"Failed to save {file_path}: {e}")
     
-def validate_json_schema(data: Dict[Any, Any], schema: Dict[Any, Any]) -> List[Dict[str, Any]]:
+def validate_json_schema(data: dict[str, Any], schema: dict[str, Any]) -> list[dict[str, Any]]:
     """
     Validate data against JSON schema
     """
@@ -136,8 +136,9 @@ def generate_command(config_files, output_dir, library_name,force):
             # Run the library generation
             result = lib_generator.generate_library(gen_context)
 
-            click.echo(f"Successfully generated library '{result['library_name']}' "
-                    f"with {result['total_files']} files in {result['output_dir']}")
+            message = f"""Successfully generated library '{result['library_name']}' \
+with {result['total_files']} files in {result['output_dir']}"""
+            click.echo(message)
         except Exception as e:
             click.echo(f"Error generating library: {str(e)}", err=True)
             raise click.ClickException(f"Failed to generate library: {str(e)}")

@@ -6,7 +6,7 @@ import inspect
 import re
 import time
 
-from typing import Any, Callable, Optional, Type, Dict, Union
+from typing import Callable
 from ..exceptions import RetryExhaustedError
 from .client import StaticBaseApiClient
 from ..consts import URL_PATH_PARAM_PATTERN
@@ -16,7 +16,7 @@ def endpoint(
     path: str, 
     auth_required: bool = True,
     body_required: bool = False,
-    timeout: Optional[int] = None,
+    timeout: int | None = None,
     max_attempts: int = 1,
     delay: float = 1.0,
     backoff_factor: float = 2.0

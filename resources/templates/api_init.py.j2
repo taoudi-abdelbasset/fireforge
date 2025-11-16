@@ -1,0 +1,11 @@
+"""
+Generated API client for {{ base_client_class_name }}
+"""
+{%- for version_name, class_name in client_classes %}
+
+from .versions.{{ version_name }} import {{ class_name }}
+{%- endfor %}
+
+from .base import {{ base_client_class_name }}
+
+__all__ = [{{ (client_classes|map(attribute='1')|list + [base_client_class_name])|map('tojson')|join(', ') }}]

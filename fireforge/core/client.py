@@ -3,7 +3,7 @@ import requests
 import inspect
 from abc import ABC
 from pathlib import Path
-from typing import Optional, Dict, Any, List, ClassVar
+from typing import Any, ClassVar
 from ..functions import parse_config
 from ..exceptions import APIError, AuthenticationError
 from .auth import BaseAuth
@@ -14,7 +14,7 @@ class StaticBaseApiClient(ABC):
     """Base API client designed for static method usage only"""    
     # Class-level configuration that subclasses should override
     api_name: ClassVar[str] = "unknown_api"
-    api_config: ClassVar[Dict[str, Any]] = {}
+    api_config: ClassVar[dict[str, Any]] = {}
     version: ClassVar[str] = "unknown_version"
     auth_handler:ClassVar[BaseAuth] = None
 
@@ -22,7 +22,7 @@ class StaticBaseApiClient(ABC):
     _class_is_initialized: ClassVar[bool] = False
 
     # private class variable to hold parsed config
-    _config: ClassVar[Dict[str, Any]] = {}
+    _config: ClassVar[dict[str, Any]] = {}
 
     def __init_subclass__(cls, **kwargs):
         # a class function to ensure class is initialized only once class attribute level, Not INIT instance level
@@ -38,13 +38,13 @@ class StaticBaseApiClient(ABC):
         cls,
         method: str,
         path: str,
-        params: Optional[Dict] = None,
-        body: Optional[Any] = None,
-        headers: Optional[Dict] = None,
-        timeout: Optional[int] = None,
+        params: dict | None = None,
+        body: Any | None = None,
+        headers: dict | None = None,
+        timeout: int | None = None,
         auth_required: bool = True,
-        base_url: Optional[str] = None,
-        auth_handler: Optional[BaseAuth] = None
+        base_url: str | None = None,
+        auth_handler: BaseAuth | None = None
     ) -> Any:
         """Execute HTTP request - called by decorator"""
                 

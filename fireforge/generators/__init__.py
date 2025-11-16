@@ -1,7 +1,7 @@
 import re
 import os
 from typing import List
-from ..functions import to_pascal_case ,to_snake_case,_parts
+from ..functions import to_pascal_case ,to_snake_case
 from ..consts import URL_PATH_PARAM_PATTERN,BASE_DIR
 
 from .base import GeneratorContext,BaseGenerator
@@ -10,8 +10,7 @@ class ClientsGenerator(BaseGenerator):
     """Generate API client classes"""
 
     def __init__(self, context: GeneratorContext):
-        template_dir = os.path.join(BASE_DIR, "resources", "templates")
-        super().__init__(context, template_dir)
+        super().__init__(context, os.path.join(BASE_DIR, "resources", "templates"))
     
     def generate(self):
         """Generate API client files including base client and version-specific clients."""
@@ -54,58 +53,21 @@ class ClientsGenerator(BaseGenerator):
             yield self.save_file(content, client_version_file)
         
         # Generate versions __init__.py
-        versions_init = self._gen_versions_init(client_classes)
-        versions_init_file = os.path.join(client_versions_dir ,"__init__.py")
+        versions_init = self.render_template(
+            "versions_init.py.j2",
+            client_classes=client_classes
+        )
+        versions_init_file = os.path.join(client_versions_dir, "__init__.py")
         yield self.save_file(versions_init, versions_init_file)
 
         # Generate base __init__.py
-        base_init = self._gen_api_init(client_classes,base_client_class_name)
-        base_init_file = os.path.join(core_dir ,"__init__.py")
+        base_init = self.render_template(
+            "api_init.py.j2",
+            base_client_class_name=base_client_class_name,
+            client_classes=client_classes
+        )
+        base_init_file = os.path.join(core_dir, "__init__.py")
         yield self.save_file(base_init, base_init_file)
-    
-    def _gen_versions_init(self, client_classes: List[tuple]) -> str:
-        """Create __init__.py for versions"""
-        imports = []
-        class_names = []
-        
-        for version_name, class_name in client_classes:
-            imports.append(f"from .{version_name} import {class_name}")
-            class_names.append(class_name)
-        
-        imports_str = "\n".join(imports)
-        exports = ", ".join(f'"{name}"' for name in class_names)
-        
-        return f'''"""
-API version clients for {self.context.api_name}
-"""
-{imports_str}
-
-__all__ = [{exports}]
-'''
-    
-    def _gen_api_init(self, client_classes: List[tuple],base_client_class_name:str):
-        """Create main API __init__.py"""
-        imports = []
-        class_names = []
-        
-        for version_name, class_name in client_classes:
-            imports.append(f"from .versions.{version_name} import {class_name}")
-            class_names.append(class_name)
-            
-        if base_client_class_name:
-            imports.append(f"from .base import {base_client_class_name}")
-            class_names.append(base_client_class_name)
-        
-        imports_str = "\n".join(imports)
-        exports = ", ".join(f'"{name}"' for name in class_names)
-        
-        return f'''"""
-Generated API client for {base_client_class_name}
-"""
-{imports_str}
-
-__all__ = [{exports}]
-'''
 
     def _extract_path_params(self, path: str) -> list[str]:
         if not path:

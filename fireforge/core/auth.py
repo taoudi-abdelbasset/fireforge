@@ -2,27 +2,46 @@ import requests
 import time
 from urllib.parse import urljoin
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, ClassVar
+from typing import Any, ClassVar
 from ..exceptions import AuthenticationError
 from ..functions import parse_config
 
+
+class ConfigMixin:
+    """Mixin to handle auth_config parsing for subclasses"""
+    auth_config: ClassVar[dict[str, Any]] = {}
+    _config: ClassVar[dict[str, Any]] = {}
+    _is_parsed: ClassVar[bool] = False
+    
+    @classmethod
+    def _init_config(cls):
+        """Parse auth_config if present and not already parsed"""
+        if not hasattr(cls, '_is_parsed') or not cls._is_parsed:
+            if hasattr(cls, 'auth_config') and cls.auth_config:
+                cls._config = parse_config(cls.auth_config)
+                cls._is_parsed = True
+                return True
+        return False
+
+
 class BaseAuth(ABC):
-    """Base authentication handler"""    
-    auth_config: ClassVar[Dict[str, Any]] = {}
-    _config: ClassVar[Dict[str, Any]] = {}
-    _registry: ClassVar[Dict[str, "BaseAuth"]] = {}
-    _class_is_initialized: ClassVar[bool] = False
+    """Base authentication handler"""
+    _registry: ClassVar[dict[str, "BaseAuth"]] = {}
 
     @classmethod
-    def __init_subclass__(cls, auth_type: str = None):
+    def __init_subclass__(cls, auth_type: str | None = None, **kwargs):
         """Register auth type and parse config"""
-        if not cls._class_is_initialized:
-            if auth_type is None and cls.auth_config is None:
-                return
+        super().__init_subclass__(**kwargs)
+        
+        if auth_type is not None:
+            if not isinstance(auth_type, str):
+                raise TypeError(f"auth_type must be str or None, got {type(auth_type).__name__}")
+            if not auth_type.strip():
+                raise ValueError("auth_type cannot be empty or whitespace")
+            if auth_type in cls._registry:
+                raise ValueError(f"Auth type '{auth_type}' already registered")
+            
             cls._registry[auth_type] = cls
-            cls._class_is_initialized = True
-        if cls.auth_config is not None:
-            cls._config = cls._parse_auth_config()
 
     @classmethod
     def create_instance(cls, auth_type: str) -> "BaseAuth":
@@ -31,43 +50,31 @@ class BaseAuth(ABC):
             raise Exception(f"Unknown auth type: {auth_type}")
         subclass = cls._registry[auth_type]
         return object.__new__(subclass)
-
-    @classmethod
-    def _parse_auth_config(cls) -> Dict[str, Any]:
-        """Parse auth config with env vars"""
-        if hasattr(cls, 'auth_config') and isinstance(cls.auth_config, dict):
-            return parse_config(cls.auth_config)
-        return {}
     
     @classmethod
     @abstractmethod
-    def apply_auth(cls, request_params: Dict[str, Any]) -> Dict[str, Any]:
+    def apply_auth(cls, request_params: dict[str, Any]) -> dict[str, Any]:
         """Apply authentication to request"""
         pass
 
-class NoAuth(BaseAuth, auth_type="None"):
-    """No authentication"""
-    @classmethod
-    def apply_auth(cls, request_params: Dict[str, Any]) -> Dict[str, Any]:
-        return request_params
-
-class StaticTokenAuth(BaseAuth, auth_type="static_token"):
+class StaticTokenAuth(BaseAuth, ConfigMixin, auth_type="static_token"):
     """Static API key/token authentication"""
     
-    token_placement: ClassVar[Dict[str, Any]] = {}
-    _token: ClassVar[Optional[str]] = None
+    token_placement: ClassVar[dict[str, Any]] = {}
+    _token: ClassVar[str | None] = None
 
     @classmethod
-    def __init_subclass__(cls, auth_type: str = None):
-        super().__init_subclass__(auth_type=auth_type)
-        cls.token_placement = cls._config.get("token_placement", {})
-        cls._token = cls._config.get("access_key")
-        
-        if not cls._token or cls._token in ("your_token_here", "default_token", ""):
-            raise AuthenticationError(f"Invalid or missing token: {cls._token}")
+    def __init_subclass__(cls, **kwargs):
+        """Initialize config for StaticTokenAuth subclasses"""
+        if cls._init_config():
+            cls.token_placement = cls._config.get("token_placement", {})
+            cls._token = cls._config.get("access_key")
+            
+            if not cls._token or cls._token in ("your_token_here", "default_token", ""):
+                raise AuthenticationError(f"Invalid or missing token: {cls._token}")
 
     @classmethod
-    def apply_auth(cls, request_params: Dict[str, Any]) -> Dict[str, Any]:
+    def apply_auth(cls, request_params: dict[str, Any]) -> dict[str, Any]:
         """Add token to request"""
         if "request_kwargs" not in request_params:
             request_params["request_kwargs"] = {}
@@ -75,58 +82,63 @@ class StaticTokenAuth(BaseAuth, auth_type="static_token"):
         placement_type = cls.token_placement.get("type", "header")
         token_field = cls.token_placement.get("token_field_name")
 
-        if placement_type == "header":
-            prefix = cls.token_placement.get("prefix", "")
-            token_value = f"{prefix} {cls._token}".strip() if prefix else cls._token
+        match placement_type:
+            case "header":
+                prefix = cls.token_placement.get("prefix", "")
+                token_value = f"{prefix} {cls._token}".strip() if prefix else cls._token
+                
+                if "headers" not in request_params["request_kwargs"]:
+                    request_params["request_kwargs"]["headers"] = {}
+                request_params["request_kwargs"]["headers"][token_field] = token_value
             
-            if "headers" not in request_params["request_kwargs"]:
-                request_params["request_kwargs"]["headers"] = {}
-            request_params["request_kwargs"]["headers"][token_field] = token_value
-        
-        elif placement_type == "query":
-            if "params" not in request_params["request_kwargs"]:
-                request_params["request_kwargs"]["params"] = {}
-            request_params["request_kwargs"]["params"][token_field] = cls._token
-        
-        elif placement_type == "body":            
-            if "json" not in request_params["request_kwargs"]:
-                request_params["request_kwargs"]["json"] = {}
-            request_params["request_kwargs"]["json"][token_field] = cls._token
-        
-        else:
-            raise AuthenticationError(f"Unknown placement type: {placement_type}")
+            case "query":
+                if "params" not in request_params["request_kwargs"]:
+                    request_params["request_kwargs"]["params"] = {}
+                request_params["request_kwargs"]["params"][token_field] = cls._token
+            
+            case "body":            
+                if "json" not in request_params["request_kwargs"]:
+                    request_params["request_kwargs"]["json"] = {}
+                request_params["request_kwargs"]["json"][token_field] = cls._token
+            
+            case _:
+                raise AuthenticationError(f"Unknown placement type: {placement_type}")
         
         return request_params
 
-class LoginTokenAuth(BaseAuth, auth_type="login_token"):
+class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
     """Login-based token authentication"""
     
-    login_endpoint: ClassVar[Dict[str, Any]] = {}
-    token_placement: ClassVar[Dict[str, Any]] = {}
-    login_body: ClassVar[Dict[str, Any]] = {}
+    base_url: ClassVar[str] = ""
+    login_endpoint: ClassVar[dict[str, Any]] = {}
+    token_placement: ClassVar[dict[str, Any]] = {}
+    login_body: ClassVar[dict[str, Any]] = {}
 
     # Token state
-    access_token: ClassVar[Optional[str]] = None
-    refresh_token: ClassVar[Optional[str]] = None
-    token_expiry: ClassVar[Optional[float]] = None
+    access_token: ClassVar[str | None] = None
+    refresh_token: ClassVar[str | None] = None
+    token_expiry: ClassVar[float | None] = None
 
     @classmethod
-    def __init_subclass__(cls, auth_type: str = None):
-        super().__init_subclass__(auth_type=auth_type)
-        cls._base_url = parse_config(cls.base_url)
-        cls.login_endpoint = cls._config.get("login_endpoint", {})
-        cls.token_placement = cls._config.get("token_placement", {})
-        cls.login_body = cls.login_endpoint.get("login_body", {})
-        
-        if not cls.login_endpoint:
-            raise AuthenticationError("Login endpoint config required")
-        if not cls.token_placement:
-            raise AuthenticationError("Token placement config required")
-        if not cls.base_url:
-            raise ValueError("Base URL config required")
+    def __init_subclass__(cls, **kwargs):
+        """Initialize config for LoginTokenAuth subclasses"""
+        if cls._init_config():
+            if hasattr(cls, 'base_url') and cls.base_url:
+                cls._base_url = parse_config(cls.base_url)
+            
+            cls.login_endpoint = cls._config.get("login_endpoint", {})
+            cls.token_placement = cls._config.get("token_placement", {})
+            cls.login_body = cls.login_endpoint.get("login_body", {})
+            
+            if not cls.login_endpoint:
+                raise AuthenticationError("Login endpoint config required")
+            if not cls.token_placement:
+                raise AuthenticationError("Token placement config required")
+            if not hasattr(cls, '_base_url') or not cls._base_url:
+                raise ValueError("Base URL config required")
 
     @classmethod
-    def login(cls, credentials: Optional[Dict[str, Any]] = None) -> str:
+    def login(cls, credentials: dict[str, Any] | None = None) -> str:
         """
         Perform login and return access token.
         User must call this manually before making API requests.
@@ -193,7 +205,7 @@ class LoginTokenAuth(BaseAuth, auth_type="login_token"):
         return time.time() >= (cls.token_expiry - 60)  # 60s buffer
 
     @classmethod
-    def apply_auth(cls, request_params: Dict[str, Any]) -> Dict[str, Any]:
+    def apply_auth(cls, request_params: dict[str, Any]) -> dict[str, Any]:
         """
         Apply authentication to request.
         Raises error if token is missing or expired.
@@ -218,25 +230,26 @@ class LoginTokenAuth(BaseAuth, auth_type="login_token"):
         placement_type = cls.token_placement.get("type", "header")
         token_field = cls.token_placement.get("token_field_name", "Authorization")
         
-        if placement_type == "header":
-            prefix = cls.token_placement.get("prefix", "")
-            token_value = f"{prefix} {cls.access_token}".strip() if prefix else cls.access_token
+        match placement_type:
+            case "header":
+                prefix = cls.token_placement.get("prefix", "")
+                token_value = f"{prefix} {cls.access_token}".strip() if prefix else cls.access_token
+                
+                if "headers" not in request_params["request_kwargs"]:
+                    request_params["request_kwargs"]["headers"] = {}
+                request_params["request_kwargs"]["headers"][token_field] = token_value
             
-            if "headers" not in request_params["request_kwargs"]:
-                request_params["request_kwargs"]["headers"] = {}
-            request_params["request_kwargs"]["headers"][token_field] = token_value
-        
-        elif placement_type == "query":
-            if "params" not in request_params["request_kwargs"]:
-                request_params["request_kwargs"]["params"] = {}
-            request_params["request_kwargs"]["params"][token_field] = cls.access_token
-        
-        elif placement_type == "body":
-            if "json" not in request_params["request_kwargs"]:
-                request_params["request_kwargs"]["json"] = {}
-            request_params["request_kwargs"]["json"][token_field] = cls.access_token
-        
-        else:
-            raise AuthenticationError(f"Unknown placement type: {placement_type}")
+            case "query":
+                if "params" not in request_params["request_kwargs"]:
+                    request_params["request_kwargs"]["params"] = {}
+                request_params["request_kwargs"]["params"][token_field] = cls.access_token
+            
+            case "body":
+                if "json" not in request_params["request_kwargs"]:
+                    request_params["request_kwargs"]["json"] = {}
+                request_params["request_kwargs"]["json"][token_field] = cls.access_token
+            
+            case _:
+                raise AuthenticationError(f"Unknown placement type: {placement_type}")
         
         return request_params
