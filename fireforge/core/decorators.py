@@ -52,7 +52,6 @@ def endpoint(
             body = args_dict.get('body') or args_dict.get('data')
             headers = args_dict.get('headers')
             req_timeout = args_dict.get('timeout', timeout)
-            base_url = args_dict.get('base_url')
             
             attempts = args_dict.get('max_attempts', max_attempts)
             retry_delay = args_dict.get('delay', delay)
@@ -75,7 +74,6 @@ def endpoint(
                 headers=headers,
                 auth_required=auth_required,
                 timeout=req_timeout,
-                base_url=base_url,
                 auth_handler=cls.auth_handler if hasattr(cls, 'auth_handler') else None,
                 max_attempts=attempts,
                 delay=retry_delay,
@@ -106,7 +104,6 @@ def _execute_with_retry(
     headers,
     auth_required: bool,
     timeout,
-    base_url,
     auth_handler,
     max_attempts: int,
     delay: float,
@@ -123,7 +120,6 @@ def _execute_with_retry(
             headers=headers,
             auth_required=auth_required,
             timeout=timeout,
-            base_url=base_url,
             auth_handler=auth_handler
         )
     
@@ -141,7 +137,6 @@ def _execute_with_retry(
                 headers=headers,
                 auth_required=auth_required,
                 timeout=timeout,
-                base_url=base_url,
                 auth_handler=auth_handler
             )
         except Exception as e:

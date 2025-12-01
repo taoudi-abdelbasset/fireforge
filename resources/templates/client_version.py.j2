@@ -38,9 +38,7 @@ class {{ client_class_name }}({{ base_client_class_name }}):
         {{ param }}: str,
         {% endfor %}
         {% endif %}
-        {% if endpoint_config.body_schema %}
         body: dict[str, Any] | None = None,
-        {% endif %}
         params: dict[str, Any] | None = None, 
         headers: dict[str,str] | None = None,
         **kwargs
