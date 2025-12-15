@@ -19,7 +19,8 @@ def endpoint(
     timeout: int | None = None,
     max_attempts: int = 1,
     delay: float = 1.0,
-    backoff_factor: float = 2.0
+    backoff_factor: float = 2.0,
+    file_upload: bool = False
 ):
     """
     Decorator to define API endpoint for class methods
@@ -52,6 +53,7 @@ def endpoint(
             body = args_dict.get('body') or args_dict.get('data')
             headers = args_dict.get('headers')
             req_timeout = args_dict.get('timeout', timeout)
+            files = args_dict.get('files') 
             
             attempts = args_dict.get('max_attempts', max_attempts)
             retry_delay = args_dict.get('delay', delay)
@@ -71,6 +73,7 @@ def endpoint(
                 path=resolved_path,
                 params=params,
                 body=body,
+                files=files,
                 headers=headers,
                 auth_required=auth_required,
                 timeout=req_timeout,
@@ -101,6 +104,7 @@ def _execute_with_retry(
     path: str,
     params,
     body,
+    files,
     headers,
     auth_required: bool,
     timeout,
@@ -120,7 +124,8 @@ def _execute_with_retry(
             headers=headers,
             auth_required=auth_required,
             timeout=timeout,
-            auth_handler=auth_handler
+            auth_handler=auth_handler,
+            files=files 
         )
     
     # Retry logic
@@ -137,7 +142,8 @@ def _execute_with_retry(
                 headers=headers,
                 auth_required=auth_required,
                 timeout=timeout,
-                auth_handler=auth_handler
+                auth_handler=auth_handler,
+                files=files 
             )
         except Exception as e:
             last_error = e

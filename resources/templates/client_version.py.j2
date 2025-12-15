@@ -39,6 +39,7 @@ class {{ client_class_name }}({{ base_client_class_name }}):
         {% endfor %}
         {% endif %}
         body: dict[str, Any] | None = None,
+        files: dict | None = None,
         params: dict[str, Any] | None = None, 
         headers: dict[str,str] | None = None,
         **kwargs

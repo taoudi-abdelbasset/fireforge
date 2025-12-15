@@ -43,8 +43,8 @@ class StaticBaseApiClient(ABC):
         headers: dict | None = None,
         timeout: int | None = None,
         auth_required: bool = True,
-        base_url: str | None = None,
-        auth_handler: BaseAuth | None = None
+        auth_handler: BaseAuth | None = None,
+        files: dict | None = None 
     ) -> Any:
         """Execute HTTP request - called by decorator"""
                 
@@ -60,11 +60,12 @@ class StaticBaseApiClient(ABC):
         
         # Prepare request headers with class config defaults
         # Basic headers configuration for rest APIs
-        request_headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json', # can be adjusted based on API requirements
-            'User-Agent': f'Generated-API-Client/{cls.__name__}/1.0'
-        }
+        if not files:
+            request_headers = {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json', # can be adjusted based on API requirements
+                'User-Agent': f'Generated-API-Client/{cls.__name__}/1.0'
+            }
         
         # Add additional headers
         if headers:
@@ -86,11 +87,22 @@ class StaticBaseApiClient(ABC):
             kwargs['params'] = {k: v for k, v in params.items() if v is not None}
         
         # Add request body
-        if body is not None:
-            if isinstance(body, (dict, list)):
-                kwargs['json'] = body
-            else:
+        if files:
+            # multipart/form-data mode
+            # Prepare files for upload
+            prepared_files = cls._prepare_files(files)
+            kwargs['files'] = prepared_files
+            
+            # If body exists, send as form data
+            if body:
                 kwargs['data'] = body
+        else:
+            # Regular JSON/data mode
+            if body is not None:
+                if isinstance(body, (dict, list)):
+                    kwargs['json'] = body
+                else:
+                    kwargs['data'] = body
         
         # Apply authentication if required
         if auth_required:
@@ -125,6 +137,53 @@ class StaticBaseApiClient(ABC):
             else:
                 print(f"Request failed: {str(e)}")
                 return None
+    
+    @classmethod
+    def _prepare_files(cls, files: dict) -> dict:
+        prepared = {}
+        
+        for field_name, file_data in files.items():
+            if isinstance(file_data, tuple):
+                # Already formatted: (filename, file_obj, content_type)
+                prepared[field_name] = file_data
+            elif isinstance(file_data, str):
+                # File path string
+                file_path = Path(file_data)
+                if not file_path.exists():
+                    raise FileNotFoundError(f"File not found: {file_data}")
+                
+                # Open file and prepare tuple
+                prepared[field_name] = (
+                    file_path.name,
+                    open(file_path, 'rb'),
+                    cls._get_content_type(file_path)
+                )
+            elif hasattr(file_data, 'read'):
+                # File-like object
+                filename = getattr(file_data, 'name', 'file')
+                prepared[field_name] = (
+                    filename,
+                    file_data,
+                    'application/octet-stream'
+                )
+            else:
+                raise ValueError(f"Invalid file data for {field_name}")
+        
+        return prepared
+
+    @classmethod
+    def _get_content_type(cls, file_path: Path) -> str:
+        """Get content type from file extension"""
+        ext = file_path.suffix.lower()
+        content_types = {
+            '.pdf': 'application/pdf',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.png': 'image/png',
+            '.txt': 'text/plain',
+            '.json': 'application/json'
+        }
+        return content_types.get(ext, 'application/octet-stream')
 
     # # TODO: Fix this method remove repsonse_model param
     @classmethod
