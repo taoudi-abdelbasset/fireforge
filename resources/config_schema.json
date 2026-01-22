@@ -18,6 +18,13 @@
         "default_version": {
             "type": "string"
         },
+        "default_headers": {
+            "type": "object",
+            "description": "Global default headers for all endpoints",
+            "additionalProperties": {
+                "type": "string"
+            }
+        },
         "timeout": {
             "type": "integer",
             "minimum": 1,
@@ -184,11 +191,7 @@
         "versions": {
             "type": "array",
             "minItems": 1,
-            "uniqueItems": {
-                "properties": {
-                    "version_name": {}
-                }
-            },
+            "uniqueItems": true,
             "items": {
                 "type": "object",
                 "required": [
@@ -203,11 +206,7 @@
                     "endpoints": {
                         "type": "array",
                         "minItems": 1,
-                        "uniqueItems": {
-                            "properties": {
-                                "function_name": {}
-                            }
-                        },
+                        "uniqueItems": true,
                         "items": {
                             "type": "object",
                             "required": [
@@ -255,6 +254,158 @@
                                 },
                                 "retry": {
                                     "$ref": "#/$defs/retry"
+                                },
+                                "headers": {
+                                    "type": "object",
+                                    "description": "Endpoint-specific headers (merged with global defaults). Supports environment variables like ${VAR:default}",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    }
+                                },
+                                "request_body": {
+                                    "type": "object",
+                                    "description": "Request body configuration",
+                                    "properties": {
+                                        "type": {
+                                            "type": "string",
+                                            "enum": [
+                                                "json",
+                                                "form_data",
+                                                "urlencoded",
+                                                "raw",
+                                                "none"
+                                            ],
+                                            "default": "json",
+                                            "description": "Body serialization type"
+                                        },
+                                        "content_type": {
+                                            "type": "string",
+                                            "description": "Content-Type header for raw bodies (e.g., text/xml, text/csv, text/plain)"
+                                        },
+                                        "fields": {
+                                            "type": "object",
+                                            "description": "Field definitions for form_data or urlencoded bodies",
+                                            "patternProperties": {
+                                                "^[a-zA-Z_][a-zA-Z0-9_]*$": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "field_type": {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "text",
+                                                                "file"
+                                                            ],
+                                                            "default": "text",
+                                                            "description": "Whether this is a text field or file field"
+                                                        },
+                                                        "content_type": {
+                                                            "type": "string",
+                                                            "description": "Content-Type for this specific field (optional, auto-detected if not set)"
+                                                        },
+                                                        "required": {
+                                                            "type": "boolean",
+                                                            "default": false,
+                                                            "description": "Whether this field is required"
+                                                        },
+                                                        "description": {
+                                                            "type": "string",
+                                                            "description": "Human-readable description of this field"
+                                                        },
+                                                        "multiple": {
+                                                            "type": "boolean",
+                                                            "default": false,
+                                                            "description": "Whether multiple files are allowed (file fields only)"
+                                                        },
+                                                        "allowed_extensions": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "string",
+                                                                "pattern": "^\\.[a-zA-Z0-9]+$"
+                                                            },
+                                                            "description": "Allowed file extensions like .pdf, .jpg (file fields only)"
+                                                        },
+                                                        "max_file_size": {
+                                                            "type": "integer",
+                                                            "minimum": 1,
+                                                            "description": "Maximum file size in bytes (file fields only)"
+                                                        }
+                                                    },
+                                                    "additionalProperties": false,
+                                                    "allOf": [
+                                                        {
+                                                            "if": {
+                                                                "properties": {
+                                                                    "field_type": {
+                                                                        "const": "text"
+                                                                    }
+                                                                }
+                                                            },
+                                                            "then": {
+                                                                "not": {
+                                                                    "anyOf": [
+                                                                        {
+                                                                            "required": [
+                                                                                "multiple"
+                                                                            ]
+                                                                        },
+                                                                        {
+                                                                            "required": [
+                                                                                "allowed_extensions"
+                                                                            ]
+                                                                        },
+                                                                        {
+                                                                            "required": [
+                                                                                "max_file_size"
+                                                                            ]
+                                                                        }
+                                                                    ]
+                                                                }
+                                                            }
+                                                        }
+                                                    ]
+                                                }
+                                            }
+                                        },
+                                        "max_total_size": {
+                                            "type": "integer",
+                                            "minimum": 1,
+                                            "description": "Maximum total size for all files in bytes"
+                                        }
+                                    },
+                                    "additionalProperties": false,
+                                    "allOf": [
+                                        {
+                                            "if": {
+                                                "properties": {
+                                                    "type": {
+                                                        "const": "raw"
+                                                    }
+                                                }
+                                            },
+                                            "then": {
+                                                "required": [
+                                                    "content_type"
+                                                ]
+                                            }
+                                        },
+                                        {
+                                            "if": {
+                                                "properties": {
+                                                    "type": {
+                                                        "enum": [
+                                                            "form_data",
+                                                            "urlencoded"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "then": {
+                                                "required": [
+                                                    "fields"
+                                                ]
+                                            }
+                                        }
+                                    ]
                                 }
                             },
                             "additionalProperties": false
@@ -272,14 +423,17 @@
             "properties": {
                 "attempts": {
                     "type": "integer",
+                    "minimum": 1,
                     "default": 3
                 },
                 "delay": {
                     "type": "number",
+                    "minimum": 0,
                     "default": 1.0
                 },
                 "backoff_factor": {
                     "type": "number",
+                    "minimum": 0,
                     "default": 2.0
                 },
                 "jitter": {
