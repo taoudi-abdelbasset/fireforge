@@ -1,16 +1,12 @@
 # ---------------------------------------------------------------------
-# THIS FILE IS GENERATED — DO NOT EDIT
+# THIS FILE IS GENERATED – DO NOT EDIT
 #
 # This Python file was automatically generated for 
 #     {{ api_name }} API version {{ version_name }}.
 #
-#
 # Generated on: {{ now().strftime("%Y-%m-%dT%H:%M:%SZ") }}
 # ---------------------------------------------------------------------
 
-"""
-@TODO put the code of the version client template, previously named "version_client_template.py.j2"
-"""
 from ..base import {{ base_client_class_name }}
 from fireforge.core import endpoint
 from typing import Any, ClassVar
@@ -24,12 +20,16 @@ class {{ client_class_name }}({{ base_client_class_name }}):
     @endpoint(
         "{{ endpoint_config.method }}", 
         "{{ endpoint_config.path }}", 
-        auth_required={{ endpoint_config.auth_required | default(False) }}{% if endpoint_config.retry %},
+        auth_required={{ endpoint_config.auth_required | default(true) }}{% if endpoint_config.body_required %},
+        body_required={{ endpoint_config.body_required }}{% endif %}{% if endpoint_config.timeout %},
+        timeout={{ endpoint_config.timeout }}{% endif %}{% if endpoint_config.retry %},
         max_attempts={{ endpoint_config.retry.attempts | default(3) }},
         delay={{ endpoint_config.retry.delay | default(1.0) }},
-        backoff_factor={{ endpoint_config.retry.backoff_factor | default(2.0) }}{% endif %}
-        
-        # additional parameters should be added in the tempalte if needed (e.g., response_model, timeout, body_required)
+        backoff_factor={{ endpoint_config.retry.backoff_factor | default(2.0) }}{% endif %}{% if endpoint_config.headers %},
+        default_headers={{ endpoint_config.headers }}{% endif %}{% if endpoint_config.override_default_headers %},
+        override_default_headers={{ endpoint_config.override_default_headers }}{% endif %}{% if endpoint_config.request_body %},
+        body_config={{ endpoint_config.request_body }}
+        {% endif %}
     )
     def {{ endpoint_config.function_name | snake_case }}(
         cls, 
@@ -39,40 +39,48 @@ class {{ client_class_name }}({{ base_client_class_name }}):
         {% endfor %}
         {% endif %}
         body: dict[str, Any] | None = None,
-        files: dict | None = None,
+        {% if endpoint_config.request_body and endpoint_config.request_body.type in ['form_data'] %}
+        files: dict[str, Any] | None = None,
+        {% endif %}
         params: dict[str, Any] | None = None, 
-        headers: dict[str,str] | None = None,
+        headers: dict[str, str] | None = None,
         **kwargs
     ):
-        """{{ endpoint_config.function_name | replace('_', ' ') }}
+        """{{ endpoint_config.function_name | replace('_', ' ') | title }}
 
         {{ endpoint_config.get('description', 'Generated endpoint method for ' + endpoint_config.function_name) }}
         
         Method: {{ endpoint_config.method }}
         Path: {{ endpoint_config.path }}
-        Auth Required: {{ endpoint_config.auth_required | default(false) }}
+        Auth Required: {{ endpoint_config.auth_required | default(true) }}
         {% if endpoint_config.body_required %}
         Body Required: {{ endpoint_config.body_required }}
+        {% endif %}
+        {% if endpoint_config.request_body and endpoint_config.request_body.type == 'form_data' %}
+        Body Type: Multipart Form Data (supports file uploads)
+        {% elif endpoint_config.request_body and endpoint_config.request_body.type %}
+        Body Type: {{ endpoint_config.request_body.type }}
         {% endif %}
 
         Args:
         {% if endpoint_config.path and '{' in endpoint_config.path %}
         {% for param in path_params[endpoint_config.function_name] %}
-            {{ param }}: identifier
+            {{ param }}: Path parameter
         {% endfor %}
         {% endif %}
-        {% if endpoint_config.body_schema %}
-            body: Request body data{% if endpoint_config.body_required %} (required){% endif %}
+        {% if endpoint_config.body_required or endpoint_config.request_body %}
+            body: Request body data{% if endpoint_config.body_required %} (required)
+            {% endif %}
+        {% endif %}
+        {% if endpoint_config.request_body and endpoint_config.request_body.type == 'form_data' %}
+            files: File uploads for multipart form data
         {% endif %}
             params: Query parameters
+            headers: Additional request headers
             **kwargs: Additional request parameters
 
         Returns:
-        {% if endpoint_config.response_schema %}
-            {{ endpoint_config.function_name | pascal_case }}Response: Parsed response object
-        {% else %}
-            dict[str, Any]: Raw response data
-        {% endif %}
+            dict[str, Any]: Response data
 
         Raises:
             AuthenticationError: If authentication fails

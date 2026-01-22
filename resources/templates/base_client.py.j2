@@ -17,7 +17,7 @@ from typing import Any, ClassVar
 {% if config.auth %}
 class {{ api_name | pascal_case }}{{ config.auth.type | pascal_case }}Auth(BaseAuth._registry["{{ config.auth.type }}"]):
     """{{ config.auth.type }} authentication handler for {{ api_name }} API"""
-    auth_config: ClassVar[dict[str, Any]] = {{ config.auth | tojson if config.auth else '{}' }}
+    auth_config: ClassVar[dict[str, Any]] = {{ config.auth if config.auth else '{}' }}
     base_url: ClassVar[str] = "{{ config.base_url }}"
 {% endif %}
 
@@ -29,13 +29,17 @@ class {{ base_client_class_name }}(StaticBaseApiClient):
         "base_url": "{{ config.base_url }}",
         "timeout": {{ config.timeout | default(30) }},
         "raise_on_error": {{ config.raise_on_error | default(true) }},
+        {% if config.default_headers %}
+        "default_headers": {{ config.default_headers }},
+        {% endif %}
         {% if config.retry %}
         "retry": {
             "attempts": {{ config.retry.attempts | default(3) }},
             "delay": {{ config.retry.delay | default(1.0) }},
             "backoff_factor": {{ config.retry.backoff_factor | default(2.0) }},
             "jitter": {{ config.retry.jitter | default(true) }}
-        }{% endif %}
+        }
+        {% endif %}
     }
 
     {% if config.auth %}
