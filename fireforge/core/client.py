@@ -112,16 +112,33 @@ class StaticBaseApiClient(ABC):
             updated_params = auth_handler.apply_auth(request_params)
 
             kwargs = updated_params.get("request_kwargs", kwargs)
-
+        
+        opened_files = []  # Track opened files
         # Make request
         try:
+            # Track file handles for cleanup
+            if 'files' in kwargs:
+                for field_name, file_data in kwargs['files'].items():
+                    # single file (tuple)
+                    if isinstance(file_data, tuple) and len(file_data) >= 2:
+                        file_obj = file_data[1]
+                        if hasattr(file_obj, 'close'):
+                            opened_files.append(file_obj)
+                    
+                    # multiple files (list of tuples)
+                    elif isinstance(file_data, list):
+                        for file_tuple in file_data:
+                            if isinstance(file_tuple, tuple) and len(file_tuple) >= 2:
+                                file_obj = file_tuple[1]
+                                if hasattr(file_obj, 'close'):
+                                    opened_files.append(file_obj)
+
             # Execute the request
             response = requests.request(method, url, **kwargs)
             
             # Check for errors - respect raise_on_error config (fresh read)
             if parsed_config.get('raise_on_error', False):
-                # logic to raise error on bad status codes
-                pass
+                response.raise_for_status()
             
             # Parse response
             return cls._parse_response(response)
@@ -132,14 +149,24 @@ class StaticBaseApiClient(ABC):
             else:
                 print(f"Request failed: {str(e)}")
                 return None
+        finally:
+            # close file handles
+            for file_obj in opened_files:
+                try:
+                    file_obj.close()
+                except:
+                    pass
 
     # # TODO: Fix this method remove repsonse_model param
     @classmethod
     def _parse_response(cls, response: requests.Response) -> Any:
         """Parse response data"""
+        if not response.text or response.text.strip() == "":
+            return None
+        
         try:
             data = response.json()
-        except ValueError:
+        except (ValueError, requests.exceptions.JSONDecodeError):
             return response.text if response.text else None
         
         return data
@@ -219,7 +246,10 @@ class RequestBodyHandler:
                     prepared_file = FileProcessor.process_file_field(
                         field_name, file_value, field_config
                     )
-                    prepared_files[field_name] = prepared_file
+                    if isinstance(prepared_file, list):
+                        prepared_files[field_name] = prepared_file
+                    else:
+                        prepared_files[field_name] = prepared_file
                 elif is_required:
                     raise ValueError(f"Required file field '{field_name}' is missing")
             
@@ -230,7 +260,14 @@ class RequestBodyHandler:
                     processed_text = cls._process_text_field(
                         field_name, text_value, field_config
                     )
-                    form_data[field_name] = processed_text
+
+                    content_type = field_config.get('content_type') 
+                    if content_type:
+                        # For text fields, use field_name as filename
+                        prepared_files[field_name] = (field_name, processed_text, content_type)
+                    else:
+                        form_data[field_name] = processed_text
+
                 elif is_required:
                     raise ValueError(f"Required text field '{field_name}' is missing")
         
