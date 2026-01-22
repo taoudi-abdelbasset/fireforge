@@ -20,7 +20,8 @@ def endpoint(
     max_attempts: int = 1,
     delay: float = 1.0,
     backoff_factor: float = 2.0,
-    file_upload: bool = False
+    default_headers: dict | None = None,
+    override_default_headers: bool = False
 ):
     """
     Decorator to define API endpoint for class methods
@@ -75,6 +76,8 @@ def endpoint(
                 body=body,
                 files=files,
                 headers=headers,
+                endpoint_headers=default_headers,
+                override_default_headers=override_default_headers,
                 auth_required=auth_required,
                 timeout=req_timeout,
                 auth_handler=cls.auth_handler if hasattr(cls, 'auth_handler') else None,
@@ -106,6 +109,8 @@ def _execute_with_retry(
     body,
     files,
     headers,
+    endpoint_headers,
+    override_default_headers,
     auth_required: bool,
     timeout,
     auth_handler,
@@ -122,6 +127,8 @@ def _execute_with_retry(
             params=params,
             body=body,
             headers=headers,
+            endpoint_headers=endpoint_headers,
+            override_default_headers=override_default_headers, 
             auth_required=auth_required,
             timeout=timeout,
             auth_handler=auth_handler,
@@ -140,6 +147,8 @@ def _execute_with_retry(
                 params=params,
                 body=body,
                 headers=headers,
+                endpoint_headers=endpoint_headers,
+                override_default_headers=override_default_headers,
                 auth_required=auth_required,
                 timeout=timeout,
                 auth_handler=auth_handler,

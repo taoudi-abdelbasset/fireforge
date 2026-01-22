@@ -255,6 +255,11 @@
                                 "retry": {
                                     "$ref": "#/$defs/retry"
                                 },
+                                "override_default_headers": {
+                                    "type": "boolean",
+                                    "default": false,
+                                    "description": "If true, ignore global default_headers and use only endpoint-specific headers"
+                                },
                                 "headers": {
                                     "type": "object",
                                     "description": "Endpoint-specific headers (merged with global defaults). Supports environment variables like ${VAR:default}",

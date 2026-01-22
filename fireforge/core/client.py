@@ -41,6 +41,8 @@ class StaticBaseApiClient(ABC):
         params: dict | None = None,
         body: Any | None = None,
         headers: dict | None = None,
+        endpoint_headers: dict | None = None,
+        override_default_headers: bool = False,
         timeout: int | None = None,
         auth_required: bool = True,
         auth_handler: BaseAuth | None = None,
@@ -58,16 +60,18 @@ class StaticBaseApiClient(ABC):
 
         url = urljoin(resolved_base_url, path.lstrip('/'))
         
-        # Prepare request headers with class config defaults
-        # Basic headers configuration for rest APIs
-        if not files:
-            request_headers = {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json', # can be adjusted based on API requirements
-                'User-Agent': f'Generated-API-Client/{cls.__name__}/1.0'
-            }
-        
         # Add additional headers
+        request_headers = {}
+        
+        # Level 1: Global default headers (skip if override is True)
+        if not override_default_headers and 'default_headers' in parsed_config:
+            request_headers.update(parsed_config['default_headers'])
+        
+        # Level 2: Endpoint-specific headers
+        if endpoint_headers:
+            request_headers.update(endpoint_headers)
+        
+        # Level 3: Runtime headers (user-provided)
         if headers:
             request_headers.update(headers)
         
@@ -85,24 +89,13 @@ class StaticBaseApiClient(ABC):
         # Add query parameters
         if params:
             kwargs['params'] = {k: v for k, v in params.items() if v is not None}
-        
-        # Add request body
-        if files:
-            # multipart/form-data mode
-            # Prepare files for upload
-            prepared_files = cls._prepare_files(files)
-            kwargs['files'] = prepared_files
-            
-            # If body exists, send as form data
-            if body:
+
+        # Add request body (TODO: handle different body types later)
+        if body is not None:
+            if isinstance(body, (dict, list)):
+                kwargs['json'] = body
+            else:
                 kwargs['data'] = body
-        else:
-            # Regular JSON/data mode
-            if body is not None:
-                if isinstance(body, (dict, list)):
-                    kwargs['json'] = body
-                else:
-                    kwargs['data'] = body
         
         # Apply authentication if required
         if auth_required:
