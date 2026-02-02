@@ -1,47 +1,47 @@
-# stages:
-#   - install
-#   - lint
-#   - audit
+stages:
+  - install
+  - lint
+  - audit
 #   - test
 #   - release
 #   - publish
 
-# variables:
-#   GIT_STRATEGY: clone
+variables:
+  GIT_STRATEGY: clone
 
-# install:
-#   stage: install
-#   cache:
-#     key: "$CI_COMMIT_REF_SLUG"
-#     paths:
-#       - .venv/
-#     policy: push
-#   script:
-#     - python -m venv .venv
-#     - source .venv/bin/activate
-#     - poetry lock
-#     - poetry install --all-extras
+install:
+  stage: install
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - .venv/
+    policy: push
+  script:
+    - python -m venv .venv
+    - source .venv/bin/activate
+    - poetry lock
+    - poetry install --all-extras
 
-# .venv:
-#   cache:
-#     key: "$CI_COMMIT_REF_SLUG"
-#     paths:
-#       - .venv/
-#     policy: pull
-#   before_script:
-#     - source .venv/bin/activate
-#     - poetry lock
-#     - poetry install --all-extras
+.venv:
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - .venv/
+    policy: pull
+  before_script:
+    - source .venv/bin/activate
+    - poetry lock
+    - poetry install --all-extras
 
-# lint:
-#   stage: lint
-#   extends: .venv
-#   script:
-#     - poe autoflake --check
-#     - poe black --check
-#     - poe lint --jobs 0
-#   except:
-#     - tags
+lint:
+  stage: lint
+  extends: .venv
+  script:
+    - poe autoflake --check
+    - poe black --check
+    - poe lint --jobs 0
+  except:
+    - tags
 
 # audit:
 #   stage: audit
