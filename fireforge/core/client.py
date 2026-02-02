@@ -118,20 +118,35 @@ class StaticBaseApiClient(ABC):
         try:
             # Track file handles for cleanup
             if 'files' in kwargs:
-                for field_name, file_data in kwargs['files'].items():
-                    # single file (tuple)
-                    if isinstance(file_data, tuple) and len(file_data) >= 2:
-                        file_obj = file_data[1]
-                        if hasattr(file_obj, 'close'):
-                            opened_files.append(file_obj)
-                    
-                    # multiple files (list of tuples)
-                    elif isinstance(file_data, list):
-                        for file_tuple in file_data:
-                            if isinstance(file_tuple, tuple) and len(file_tuple) >= 2:
-                                file_obj = file_tuple[1]
+                files_param = kwargs['files']
+                
+                # Handle list format: [('field', (filename, file_obj, content_type)), ...]
+                if isinstance(files_param, list):
+                    for item in files_param:
+                        if isinstance(item, tuple) and len(item) >= 2:
+                            # item = ('field_name', (filename, file_obj, content_type))
+                            file_data = item[1]
+                            if isinstance(file_data, tuple) and len(file_data) >= 2:
+                                file_obj = file_data[1]
                                 if hasattr(file_obj, 'close'):
                                     opened_files.append(file_obj)
+                
+                # Handle dict format (backward compatibility)
+                elif isinstance(files_param, dict):
+                    for field_name, file_data in files_param.items():
+                        # single file (tuple)
+                        if isinstance(file_data, tuple) and len(file_data) >= 2:
+                            file_obj = file_data[1]
+                            if hasattr(file_obj, 'close'):
+                                opened_files.append(file_obj)
+                        
+                        # multiple files (list of tuples)
+                        elif isinstance(file_data, list):
+                            for file_tuple in file_data:
+                                if isinstance(file_tuple, tuple) and len(file_tuple) >= 2:
+                                    file_obj = file_tuple[1]
+                                    if hasattr(file_obj, 'close'):
+                                        opened_files.append(file_obj)
 
             # Execute the request
             response = requests.request(method, url, **kwargs)
@@ -231,7 +246,7 @@ class RequestBodyHandler:
         """Handle multipart/form-data body"""
         fields_config = body_config.get('fields', {})
         
-        prepared_files = {}
+        prepared_files = []
         form_data = {}
         
         # Loop through configured fields
@@ -247,9 +262,10 @@ class RequestBodyHandler:
                         field_name, file_value, field_config
                     )
                     if isinstance(prepared_file, list):
-                        prepared_files[field_name] = prepared_file
+                        for file_tuple in prepared_file:
+                            prepared_files.append((field_name, file_tuple))
                     else:
-                        prepared_files[field_name] = prepared_file
+                        prepared_files.append((field_name, prepared_file))
                 elif is_required:
                     raise ValueError(f"Required file field '{field_name}' is missing")
             
@@ -264,7 +280,7 @@ class RequestBodyHandler:
                     content_type = field_config.get('content_type') 
                     if content_type:
                         # For text fields, use field_name as filename
-                        prepared_files[field_name] = (field_name, processed_text, content_type)
+                        prepared_files.append((field_name, (field_name, processed_text, content_type)))
                     else:
                         form_data[field_name] = processed_text
 
