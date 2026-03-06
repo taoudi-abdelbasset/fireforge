@@ -5,6 +5,7 @@ from abc import ABC, abstractmethod
 from typing import Any, ClassVar
 from ..exceptions import AuthenticationError
 from ..functions import parse_config
+import traceback
 
 
 class ConfigMixin:
@@ -12,7 +13,7 @@ class ConfigMixin:
     auth_config: ClassVar[dict[str, Any]] = {}
     _config: ClassVar[dict[str, Any]] = {}
     _is_parsed: ClassVar[bool] = False
-    
+
     @classmethod
     def _init_config(cls):
         """Parse auth_config if present and not already parsed"""
@@ -138,6 +139,33 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
                 raise ValueError("Base URL config required")
 
     @classmethod
+    def on_before_login(cls, request_kwargs: dict[str, Any]) -> dict[str, Any]:
+        """
+        Override to modify the full request before it is sent.
+        Receives and must return the full request_kwargs dict.
+        You can add/modify url, method, json, headers, params.
+        You cannot remove existing keys (merge enforced by caller).
+        """
+        return request_kwargs
+
+    @classmethod
+    def on_after_login(cls, response_data: dict[str, Any]) -> None:
+        """
+        Override to handle the successful login response.
+        Raise AuthenticationError here to abort the login.
+        """
+        pass
+
+    @classmethod
+    def on_login_error(cls, status_code: int, response_data: dict[str, Any]) -> None:
+        """
+        Override to handle login HTTP errors (non-2xx).
+        Raise AuthenticationError with a custom message,
+        or do nothing to let the default fallback proceed.
+        """
+        pass
+
+    @classmethod
     def login(cls, credentials: dict[str, Any] | None = None) -> str:
         """
         Perform login and return access token.
@@ -156,17 +184,48 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
         login_method = cls.login_endpoint.get('method', 'POST')
         login_url = urljoin(cls._base_url,login_path.lstrip('/'))
         
-        response = requests.request(method=login_method, url=login_url, json=creds)
+        request_kwargs: dict[str, Any] = {
+            "url":     login_url,
+            "method":  login_method,
+            "json":    dict(creds),
+            "headers": {},
+            "params":  {},
+        }
+
+        hook_result = cls.on_before_login(dict(request_kwargs))
+
+        if isinstance(hook_result, dict):
+            # scalar top-level fields
+            for key in ("url", "method"):
+                if key in hook_result:
+                    request_kwargs[key] = hook_result[key]
+            # nested dicts — merge (hook keys win, but original keys stay if hook didn't touch them)
+            for key in ("json", "headers", "params"):
+                if key in hook_result and isinstance(hook_result[key], dict):
+                    request_kwargs[key].update(hook_result[key])
+
+        response = requests.request(
+            method  = request_kwargs["method"],
+            url     = request_kwargs["url"],
+            json    = request_kwargs["json"]    or None,
+            headers = request_kwargs["headers"] or None,
+            params  = request_kwargs["params"]  or None,
+        )
         
         if response.status_code not in [200, 201]:
-            error_msg = f"Login failed: {response.status_code}"
             try:
                 error_data = response.json()
-                if isinstance(error_data, dict) and 'message' in error_data:
-                    error_msg = error_data['message']
-            except:
-                pass
-            raise AuthenticationError(error_msg)
+            except Exception:
+                error_data = {}
+            try:
+                cls.on_login_error(response.status_code, error_data)
+            except Exception:
+                raise Exception
+
+            # default fallback
+            raise AuthenticationError(
+                error_data.get('message', f"Login failed with status {response.status_code}")
+            )
         
         data = response.json()
         
@@ -187,6 +246,8 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
         if expires_field and expires_field in data:
             expires_in = data[expires_field]
             cls.token_expiry = time.time() + expires_in
+        
+        cls.on_after_login(data)
         
         return cls.access_token
 
