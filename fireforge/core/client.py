@@ -172,19 +172,25 @@ class StaticBaseApiClient(ABC):
                 except:
                     pass
 
-    # # TODO: Fix this method remove repsonse_model param
+    # # TODO: Fix this method
     @classmethod
     def _parse_response(cls, response: requests.Response) -> Any:
         """Parse response data"""
         if not response.text or response.text.strip() == "":
+            if response.status_code >= 400:
+                return {"_status_code": response.status_code, "_error": True}
             return None
         
         try:
             data = response.json()
+            # attach status code to dict responses for error handling downstream
+            if isinstance(data, dict):
+                data["_status_code"] = response.status_code
+                if response.status_code >= 400:
+                    data["_error"] = True
+            return data
         except (ValueError, requests.exceptions.JSONDecodeError):
             return response.text if response.text else None
-        
-        return data
     
     @classmethod
     def _handle_request_body(cls, body, files, body_config):
