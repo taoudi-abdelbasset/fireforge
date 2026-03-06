@@ -130,6 +130,7 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
             cls.login_endpoint = cls._config.get("login_endpoint", {})
             cls.token_placement = cls._config.get("token_placement", {})
             cls.login_body = cls.login_endpoint.get("login_body", {})
+            cls.login_timeout = cls.login_endpoint.get("timeout", 30)
             
             if not cls.login_endpoint:
                 raise AuthenticationError("Login endpoint config required")
@@ -210,6 +211,7 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
             json    = request_kwargs["json"]    or None,
             headers = request_kwargs["headers"] or None,
             params  = request_kwargs["params"]  or None,
+            timeout = cls.login_timeout,
         )
         
         if response.status_code not in [200, 201]:
