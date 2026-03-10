@@ -50,6 +50,9 @@ def parse_config(config: Any) -> Any:
             def replace_match(match):
                 var_name = match.group(1)  # The variable name
                 default = match.group(2)   # The default value (if any)
+                print("var_name : ", var_name)
+                print("default : ", default)
+                # print("os.getenv(var_name, defa) : ", os.getenv(var_name, default if default is not None else ""))
                 return os.getenv(var_name, default if default is not None else "")
             return re.sub(DOTENV_PLACEHOLDER_PATTERN, replace_match, config)
         case _:

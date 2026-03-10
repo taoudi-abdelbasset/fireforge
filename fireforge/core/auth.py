@@ -124,6 +124,8 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
     def __init_subclass__(cls, **kwargs):
         """Initialize config for LoginTokenAuth subclasses"""
         if cls._init_config():
+            print(f"🔧 [AUTH INIT] Initializing {cls.__name__}")
+            print(f"   └─ Token before init: {getattr(cls, 'access_token', None)}")
             if hasattr(cls, 'base_url') and cls.base_url:
                 cls._base_url = parse_config(cls.base_url)
             
@@ -175,6 +177,14 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
         Returns:
             Access token string
         """
+
+        print("\n" + "🔑"*40)
+        print("⚠️  LOGIN CALLED - STACK TRACE:")
+        print("="*80)
+        traceback.print_stack()
+        print("="*80)
+        print("🔑"*40 + "\n")
+
         creds = credentials or cls.login_body
         creds = {k: v for k, v in creds.items() if v and v != ""}
         
@@ -184,6 +194,10 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
         login_path = cls.login_endpoint.get('path')
         login_method = cls.login_endpoint.get('method', 'POST')
         login_url = urljoin(cls._base_url,login_path.lstrip('/'))
+
+        print("Login login_method is : ", login_method)
+        print("Login login_url is : ", login_url)
+        print("Login creds is : ", creds)
         
         request_kwargs: dict[str, Any] = {
             "url":     login_url,
@@ -204,15 +218,21 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
             for key in ("json", "headers", "params"):
                 if key in hook_result and isinstance(hook_result[key], dict):
                     request_kwargs[key].update(hook_result[key])
+        try:
 
-        response = requests.request(
-            method  = request_kwargs["method"],
-            url     = request_kwargs["url"],
-            json    = request_kwargs["json"]    or None,
-            headers = request_kwargs["headers"] or None,
-            params  = request_kwargs["params"]  or None,
-            timeout = cls.login_timeout,
-        )
+            response = requests.request(
+                method  = request_kwargs["method"],
+                url     = request_kwargs["url"],
+                json    = request_kwargs["json"]    or None,
+                headers = request_kwargs["headers"] or None,
+                params  = request_kwargs["params"]  or None,
+                timeout = cls.login_timeout,
+            )
+        
+        except requests.exceptions.Timeout:
+            raise AuthenticationError(f"Login request timed out after {cls.login_timeout}s")
+        except requests.exceptions.ConnectionError:
+            raise AuthenticationError("Login request failed: unable to connect")
         
         if response.status_code not in [200, 201]:
             try:
