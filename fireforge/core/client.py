@@ -395,6 +395,7 @@ class FileProcessor:
         is_multiple = field_config.get('multiple', False)
         allowed_extensions = field_config.get('allowed_extensions', [])
         max_file_size = field_config.get('max_file_size')
+        content_type = field_config.get('content_type')
         
         # Handle multiple files
         if is_multiple:
@@ -404,14 +405,14 @@ class FileProcessor:
             processed = []
             for file_item in file_value:
                 processed_item = FileProcessor.process_single_file(
-                    field_name, file_item, allowed_extensions, max_file_size
+                    field_name, file_item, allowed_extensions, max_file_size, content_type
                 )
                 processed.append(processed_item)
             return processed
         
         # Handle single file
         return FileProcessor.process_single_file(
-            field_name, file_value, allowed_extensions, max_file_size
+            field_name, file_value, allowed_extensions, max_file_size, content_type
         )
 
     @staticmethod
@@ -419,28 +420,23 @@ class FileProcessor:
         field_name: str,
         file_value: Any,
         allowed_extensions: list,
-        max_file_size: int | None
+        max_file_size: int | None,
+        content_type: str | None = None,                          # ← ADD PARAM
     ) -> tuple:
-        """Process a single file and return (filename, file_obj, content_type)"""
-        
-        # Case 1: Already a tuple (filename, file_obj, content_type)
+        # Case 1: Already a tuple — trust it as-is
         if isinstance(file_value, tuple):
             return file_value
-        
+
         # Case 2: File path (string)
         if isinstance(file_value, str):
             file_path = Path(file_value)
             if not file_path.exists():
                 raise FileNotFoundError(f"File not found: {file_value}")
-            
-            # Validate extension
             if allowed_extensions and file_path.suffix.lower() not in allowed_extensions:
                 raise ValueError(
                     f"File '{file_path.name}' has invalid extension. "
                     f"Allowed: {', '.join(allowed_extensions)}"
                 )
-            
-            # Validate size
             if max_file_size:
                 file_size = file_path.stat().st_size
                 if file_size > max_file_size:
@@ -448,17 +444,19 @@ class FileProcessor:
                         f"File '{file_path.name}' exceeds max size "
                         f"({file_size} > {max_file_size} bytes)"
                     )
-            
+            resolved_ct = content_type or FileProcessor.get_content_type(file_path)  # ← USE IT
             file_obj = open(file_path, 'rb')
-            return (file_path.name, file_obj, FileProcessor.get_content_type(file_path))
-        
+            return (file_path.name, file_obj, resolved_ct)
+
         # Case 3: File-like object
         if hasattr(file_value, 'read'):
             filename = getattr(file_value, 'name', field_name)
-            return (filename, file_value, 'application/octet-stream')
-        
+            resolved_ct = content_type or 'application/octet-stream'                  # ← USE IT
+            return (filename, file_value, resolved_ct)
+
         # Case 4: Bytes
         if isinstance(file_value, bytes):
-            return (field_name, file_value, 'application/octet-stream')
-        
+            resolved_ct = content_type or 'application/octet-stream'                  # ← USE IT
+            return (field_name, file_value, resolved_ct)
+
         raise ValueError(f"Invalid file data for field '{field_name}'")
