@@ -43,6 +43,9 @@ class {{ client_class_name }}({{ base_client_class_name }}):
         files: dict[str, Any] | None = None,
         {% endif %}
         params: dict[str, Any] | None = None, 
+        {% if endpoint_config.auth_required %}
+        instant_key: str | None = None,
+        {% endif %}
         headers: dict[str, str] | None = None,
         **kwargs
     ):

@@ -137,6 +137,14 @@
                         "access_key": {
                             "type": "string"
                         },
+                        "multi_user": {
+                            "type": "boolean",
+                            "default": false
+                        },
+                        "multi_user_fallback": {
+                            "type": "boolean",
+                            "default": false
+                        },
                         "token_placement": {
                             "type": "object",
                             "properties": {

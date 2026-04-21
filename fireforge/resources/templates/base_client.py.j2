@@ -19,6 +19,12 @@ class {{ api_name | pascal_case }}{{ config.auth.type | pascal_case }}Auth(BaseA
     """{{ config.auth.type }} authentication handler for {{ api_name }} API"""
     auth_config: ClassVar[dict[str, Any]] = {{ config.auth if config.auth else '{}' }}
     base_url: ClassVar[str] = "{{ config.base_url }}"
+    {% if config.auth.multi_user is defined and config.auth.multi_user %}
+    multi_user = True
+    {% endif %}
+    {% if config.auth.multi_user_fallback is defined and config.auth.multi_user_fallback %}
+    multi_user_fallback = True
+    {% endif %}
 {% endif %}
 
 class {{ base_client_class_name }}(StaticBaseApiClient):
