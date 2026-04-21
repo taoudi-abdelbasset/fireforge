@@ -47,6 +47,7 @@ class StaticBaseApiClient(ABC):
         auth_required: bool = True,
         auth_handler: BaseAuth | None = None,
         files: dict | None = None,
+        instant_key=None,
         body_config: dict | None = None 
     ) -> Any:
         """Execute HTTP request - called by decorator"""
@@ -109,7 +110,7 @@ class StaticBaseApiClient(ABC):
             request_params = {"request_kwargs": kwargs}
 
             # add auth to request
-            updated_params = auth_handler.apply_auth(request_params)
+            updated_params = auth_handler.apply_auth(request_params, key=instant_key)
 
             kwargs = updated_params.get("request_kwargs", kwargs)
         

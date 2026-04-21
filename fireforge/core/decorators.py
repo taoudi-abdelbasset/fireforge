@@ -56,6 +56,7 @@ def endpoint(
             headers = args_dict.get('headers')
             req_timeout = args_dict.get('timeout', timeout)
             files = args_dict.get('files') 
+            instant_key = args_dict.get('instant_key', None)
             
             attempts = args_dict.get('max_attempts', max_attempts)
             retry_delay = args_dict.get('delay', delay)
@@ -76,6 +77,7 @@ def endpoint(
                 params=params,
                 body=body,
                 files=files,
+                instant_key=instant_key,
                 headers=headers,
                 endpoint_headers=default_headers,
                 override_default_headers=override_default_headers,
@@ -114,6 +116,7 @@ def _execute_with_retry(
     endpoint_headers,
     override_default_headers,
     body_config,
+    instant_key,
     auth_required: bool,
     timeout,
     auth_handler,
@@ -136,6 +139,7 @@ def _execute_with_retry(
             auth_required=auth_required,
             timeout=timeout,
             auth_handler=auth_handler,
+            instant_key=instant_key,
             files=files 
         )
     
@@ -157,6 +161,7 @@ def _execute_with_retry(
                 auth_required=auth_required,
                 timeout=timeout,
                 auth_handler=auth_handler,
+                instant_key=instant_key,
                 files=files 
             )
         except Exception as e:

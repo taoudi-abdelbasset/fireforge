@@ -120,6 +120,10 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
     refresh_token: ClassVar[str | None] = None
     token_expiry: ClassVar[float | None] = None
 
+    multi_user: ClassVar[bool] = False
+    multi_user_fallback: ClassVar[bool] = False
+    _store: ClassVar[dict] = {}
+
     @classmethod
     def __init_subclass__(cls, **kwargs):
         """Initialize config for LoginTokenAuth subclasses"""
@@ -169,7 +173,7 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
         pass
 
     @classmethod
-    def login(cls, credentials: dict[str, Any] | None = None) -> str:
+    def login(cls, credentials: dict[str, Any] | None = None, key=None) -> str:
         """
         Perform login and return access token.
         User must call this manually before making API requests.
@@ -178,26 +182,18 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
             Access token string
         """
 
-        print("\n" + "🔑"*40)
-        print("⚠️  LOGIN CALLED - STACK TRACE:")
-        print("="*80)
-        traceback.print_stack()
-        print("="*80)
-        print("🔑"*40 + "\n")
-
         creds = credentials or cls.login_body
         creds = {k: v for k, v in creds.items() if v and v != ""}
         
         if not creds:
             raise AuthenticationError("No login credentials provided")
         
+        if cls.multi_user and key is None:
+            raise AuthenticationError("multi_user mode requires a key")
+        
         login_path = cls.login_endpoint.get('path')
         login_method = cls.login_endpoint.get('method', 'POST')
         login_url = urljoin(cls._base_url,login_path.lstrip('/'))
-
-        print("Login login_method is : ", login_method)
-        print("Login login_url is : ", login_url)
-        print("Login creds is : ", creds)
         
         request_kwargs: dict[str, Any] = {
             "url":     login_url,
@@ -210,14 +206,13 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
         hook_result = cls.on_before_login(dict(request_kwargs))
 
         if isinstance(hook_result, dict):
-            # scalar top-level fields
-            for key in ("url", "method"):
-                if key in hook_result:
-                    request_kwargs[key] = hook_result[key]
-            # nested dicts — merge (hook keys win, but original keys stay if hook didn't touch them)
-            for key in ("json", "headers", "params"):
-                if key in hook_result and isinstance(hook_result[key], dict):
-                    request_kwargs[key].update(hook_result[key])
+            for item_key in ("url", "method"):
+                if item_key in hook_result:
+                    request_kwargs[item_key] = hook_result[item_key]
+            for item_key in ("json", "headers", "params"):
+                if item_key in hook_result and isinstance(hook_result[item_key], dict):
+                    request_kwargs[item_key].update(hook_result[item_key])
+
         try:
 
             response = requests.request(
@@ -228,7 +223,7 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
                 params  = request_kwargs["params"]  or None,
                 timeout = cls.login_timeout,
             )
-        
+
         except requests.exceptions.Timeout:
             raise AuthenticationError(f"Login request timed out after {cls.login_timeout}s")
         except requests.exceptions.ConnectionError:
@@ -242,9 +237,7 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
             try:
                 cls.on_login_error(response.status_code, error_data)
             except Exception:
-                raise Exception
-
-            # default fallback
+                raise
             raise AuthenticationError(
                 error_data.get('message', f"Login failed with status {response.status_code}")
             )
@@ -253,86 +246,116 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
         
         # Extract access token
         token_field = cls.login_endpoint.get('token_field', 'access_token')
-        cls.access_token = data.get(token_field)
-        
-        if not cls.access_token:
+        token_value = data.get(token_field)
+        if not token_value:
             raise AuthenticationError(f"Token field '{token_field}' not found in response")
-        
-        # Extract refresh token (optional)
+
+        # Extract refresh token
+        refresh_value = None
         refresh_field = cls.login_endpoint.get('refresh_token_field')
         if refresh_field:
-            cls.refresh_token = data.get(refresh_field)
-        
-        # Extract expiry (optional)
+            refresh_value = data.get(refresh_field)
+
+        # Extract expiry
+        expiry_value = None
         expires_field = cls.login_endpoint.get('expires_in_field')
         if expires_field and expires_field in data:
-            expires_in = data[expires_field]
-            cls.token_expiry = time.time() + expires_in
-        
+            expiry_value = time.time() + data[expires_field]
+
+        # Store — multi_user or single
+        if cls.multi_user:
+            cls._store[key] = {
+                "token":         token_value,
+                "refresh_token": refresh_value,
+                "expiry":        expiry_value,
+            }
+        else:
+            cls.access_token  = token_value
+            cls.refresh_token = refresh_value
+            cls.token_expiry  = expiry_value
+
         cls.on_after_login(data)
-        
-        return cls.access_token
+        return token_value
 
     @classmethod
-    def logout(cls):
-        """Clear all tokens"""
-        cls.access_token = None
-        cls.refresh_token = None
-        cls.token_expiry = None
+    def logout(cls, key=None):
+        if cls.multi_user:
+            cls._store.pop(key, None)
+        else:
+            cls.access_token  = None
+            cls.refresh_token = None
+            cls.token_expiry  = None
 
     @classmethod
-    def is_token_expired(cls) -> bool:
-        """Check if token is expired"""
-        if not cls.token_expiry:
-            return False
-        return time.time() >= (cls.token_expiry - 60)  # 60s buffer
+    def is_token_expired(cls, key=None) -> bool:
+        if cls.multi_user:
+            entry = cls._store.get(key, {})
+            expiry = entry.get("expiry")
+            if not expiry:
+                return False
+            return time.time() >= (expiry - 60)
+        else:
+            if not cls.token_expiry:
+                return False
+            return time.time() >= (cls.token_expiry - 60)
 
     @classmethod
-    def apply_auth(cls, request_params: dict[str, Any]) -> dict[str, Any]:
-        """
-        Apply authentication to request.
-        Raises error if token is missing or expired.
-        User must call login() first.
-        """
-        # Check if token exists
-        if not cls.access_token:
-            raise AuthenticationError(
-                "Not authenticated. Call login() first to obtain access token."
-            )
-        
-        # Check if token is expired
-        if cls.is_token_expired():
-            raise AuthenticationError(
-                "Access token has expired. Call login() again to refresh."
-            )
-        
-        # Apply token to request
+    def has_token(cls, key=None) -> bool:
+        if cls.multi_user:
+            return bool(cls._store.get(key, {}).get("token"))
+        return bool(cls.access_token)
+
+    @classmethod
+    def apply_auth(cls, request_params: dict[str, Any], key=None) -> dict[str, Any]:
+        # Resolve which token to use
+        if cls.multi_user:
+            if key is None:
+                if not cls.multi_user_fallback:
+                    raise AuthenticationError(
+                        "multi_user mode requires a key. Pass instant_key= or set multi_user_fallback=True"
+                    )
+                # fallback to class-level token
+                token = cls.access_token
+                expired = cls.is_token_expired()
+            else:
+                entry = cls._store.get(key)
+                if not entry or not entry.get("token"):
+                    raise AuthenticationError(
+                        f"No token found for key '{key}'. Call login(credentials=..., key='{key}') first."
+                    )
+                token = entry["token"]
+                expired = cls.is_token_expired(key=key)
+        else:
+            token = cls.access_token
+            expired = cls.is_token_expired()
+
+        if not token:
+            raise AuthenticationError("Not authenticated. Call login() first.")
+        if expired:
+            raise AuthenticationError("Access token has expired. Call login() again.")
+
         if "request_kwargs" not in request_params:
             request_params["request_kwargs"] = {}
-        
+
         placement_type = cls.token_placement.get("type", "header")
-        token_field = cls.token_placement.get("token_field_name", "Authorization")
-        
+        token_field    = cls.token_placement.get("token_field_name", "Authorization")
+
         match placement_type:
             case "header":
                 prefix = cls.token_placement.get("prefix", "")
-                token_value = f"{prefix} {cls.access_token}".strip() if prefix else cls.access_token
-                
+                token_value = f"{prefix} {token}".strip() if prefix else token
                 if "headers" not in request_params["request_kwargs"]:
                     request_params["request_kwargs"]["headers"] = {}
                 request_params["request_kwargs"]["headers"][token_field] = token_value
-            
             case "query":
                 if "params" not in request_params["request_kwargs"]:
                     request_params["request_kwargs"]["params"] = {}
-                request_params["request_kwargs"]["params"][token_field] = cls.access_token
-            
+                request_params["request_kwargs"]["params"][token_field] = token
             case "body":
                 if "json" not in request_params["request_kwargs"]:
                     request_params["request_kwargs"]["json"] = {}
-                request_params["request_kwargs"]["json"][token_field] = cls.access_token
-            
+                request_params["request_kwargs"]["json"][token_field] = token
             case _:
                 raise AuthenticationError(f"Unknown placement type: {placement_type}")
-        
+
         return request_params
