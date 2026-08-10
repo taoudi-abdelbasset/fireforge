@@ -3,11 +3,11 @@ requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [project]
-name = "fireforge"
-version = "0.0.0"
+name = "restapi-library"
+version = "0.1.0"
 description = "A forge for External API, builds library from external API specifications."
 readme = "README.md"
-license = { text = "Proprietary" }
+license = { text = "MIT" }
 authors = [
     { name = "Firethunder", email = "dev@firethunder.ma" },
     { name = "Abdelbasset Taoudi", email = "taoudiabdelbasset.contact@gmail.com" },
@@ -22,13 +22,11 @@ requires-python = ">=3.11,<4.0"
 dependencies = ["jsonschema (>=4.25.1,<5.0.0)", "requests (>=2.32.5,<3.0.0)"]
 
 [project.optional-dependencies]
-cli = ["jinja2 (>=3.1.6,<4.0.0)", "click (>=8.1.0,<8.2.0)"]
+cli = ["jinja2 (>=3.1.6,<4.0.0)", "click (>=8.1.0,<8.2.0)", "ujson (>=5.10.0,<6.0.0)"]
 
-[[tool.poetry.include]]
-path = "resources"
-
-[tool.setuptools]
-packages = ["fireforge"]
+[tool.poetry]
+packages = [{ include = "fireforge" }]
+include = [{ path = "fireforge/resources/**/*", format = ["sdist", "wheel"] }]
 
 [tool.poetry.group.dev.dependencies]
 autoflake = "^2.3.1"
@@ -39,9 +37,6 @@ taskipy = "^1.14.1"
 pre-commit = "^4.3.0"
 gitlint = "^0.19.1"
 python-semantic-release = "^10.4.1"
-
-[tool.setuptools.package-data]
-"fireforge" = ["resources/**/*", "resources/*"]
 
 [project.scripts]
 forge-cli = "fireforge.cli:run"
@@ -147,7 +142,7 @@ commit_message = "chore: semantic-release generated {version}"
 commit_parser = "conventional"
 tag_format = "{version}"
 version_toml = ["pyproject.toml:project.version"]
-version_variables = ["cli/__init__.py:__version__"]
+version_variables = ["fireforge/cli/__init__.py:__version__"]
 
 [tool.semantic_release.remote]
 type = "gitlab"
