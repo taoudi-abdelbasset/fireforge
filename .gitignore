@@ -59,4 +59,8 @@ docs/_build/
 # tools.protobuf
 .protobuf
 
-*.backup*.FireForge-src/
+*.backup*
+
+# internal test data / scratch sources
+.FireForge-src/
+
