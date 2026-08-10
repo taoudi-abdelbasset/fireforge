@@ -59,4 +59,4 @@ docs/_build/
 # tools.protobuf
 .protobuf
 
-*.backup*
+*.backup*.FireForge-src/
