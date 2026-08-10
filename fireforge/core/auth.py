@@ -124,6 +124,51 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
     multi_user_fallback: ClassVar[bool] = False
     _store: ClassVar[dict] = {}
 
+
+    # Set to True to print full request + response details on every login attempt
+    debug: ClassVar[bool] = False
+
+
+    @classmethod
+    def _debug_print(cls, response: "requests.Response | None", request_kwargs: dict[str, Any]) -> None:
+        """Print full request and response details when debug=True"""
+        SEP = "─" * 60
+        print(f"\n{'🐛 LOGIN DEBUG':^60}")
+        print(SEP)
+
+        # ── REQUEST ──────────────────────────────────────────────
+        print("📤  REQUEST")
+        print(f"  Method  : {request_kwargs.get('method')}")
+        print(f"  URL     : {request_kwargs.get('url')}")
+        
+        for key in ["params", "headers"]:
+            if request_kwargs.get(key):
+                print(f"  {key.capitalize():<8}: {request_kwargs[key]}")
+
+        if request_kwargs.get("json"):
+            import json as _json
+            print(f"  Body    : {_json.dumps(request_kwargs['json'], indent=4, ensure_ascii=False)}")
+
+        print(SEP)
+
+        # ── RESPONSE ─────────────────────────────────────────────
+        if response is None:
+            # FIXED: Removed the .json() and .status calls on the None object
+            print("📥  RESPONSE: <FAILED> No response received (Timeout or Connection Error)")
+        else:
+            status_icon = "✅" if response.status_code in (200, 201) else "❌"
+            print(f"📥  RESPONSE  {status_icon}")
+            print(f"  Status  : {response.status_code} {response.reason}")
+            
+            try:
+                import json as _json
+                body = response.json()
+                print(f"  Body    : {_json.dumps(body, indent=4, ensure_ascii=False)}")
+            except Exception:
+                print(f"  Body    : {response.text!r}")
+
+        print(SEP + "\n")
+
     @classmethod
     def __init_subclass__(cls, **kwargs):
         """Initialize config for LoginTokenAuth subclasses"""
@@ -225,9 +270,16 @@ class LoginTokenAuth(BaseAuth, ConfigMixin, auth_type="login_token"):
             )
 
         except requests.exceptions.Timeout:
+            if cls.debug:
+                cls._debug_print(None, request_kwargs)
             raise AuthenticationError(f"Login request timed out after {cls.login_timeout}s")
-        except requests.exceptions.ConnectionError:
-            raise AuthenticationError("Login request failed: unable to connect")
+        except requests.exceptions.ConnectionError as e:
+            if cls.debug:
+                cls._debug_print(None, request_kwargs)
+            raise AuthenticationError(f"Login request failed: unable to connect : {e}")
+        
+        if cls.debug:
+            cls._debug_print(response, request_kwargs)
         
         if response.status_code not in [200, 201]:
             try:

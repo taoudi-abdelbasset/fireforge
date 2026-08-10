@@ -41,6 +41,7 @@ def parse_config(config: Any) -> Any:
     Parse value with ${VAR:default} or ${VAR} syntax (original interface).
     """    
     # If input is a dictionary, process it recursively
+    print("Config  : ", config)
     match config:
         case dict():
             return {key: parse_config(value) for key, value in config.items()}

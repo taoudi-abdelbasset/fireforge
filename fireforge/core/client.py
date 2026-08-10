@@ -149,6 +149,43 @@ class StaticBaseApiClient(ABC):
                                     if hasattr(file_obj, 'close'):
                                         opened_files.append(file_obj)
 
+            # --- JSON Debug Print Section ---
+            debug_info = {
+                "event": "Fireforeg.BaseClient.execute",
+                "request_details": {
+                    "method": method,
+                    "url": url,
+                    "timeout": kwargs.get('timeout'),
+                    "headers": kwargs.get('headers', {}),
+                    "params": kwargs.get('params')
+                }
+            }
+
+            # Handle body content
+            if kwargs.get('json'):
+                debug_info["request_details"]["body_json"] = kwargs.get('json')
+            elif kwargs.get('data'):
+                debug_info["request_details"]["body_data"] = str(kwargs.get('data'))
+
+            # Handle file metadata
+            if 'files' in kwargs:
+                files_data = kwargs['files']
+                if isinstance(files_data, list):
+                    debug_info["request_details"]["files"] = [
+                        {"field": f[0], "filename": f[1][0] if isinstance(f[1], tuple) else "unknown"} 
+                        for f in files_data
+                    ]
+                elif isinstance(files_data, dict):
+                    debug_info["request_details"]["files"] = [
+                        {"field": k, "filename": v[0] if isinstance(v, tuple) else "unknown"} 
+                        for k, v in files_data.items()
+                    ]
+
+            print("\n[DEBUG_JSON_START]")
+            print(json.dumps(debug_info, indent=2))
+            print("[DEBUG_JSON_END]\n")
+            # --- End JSON Debug Print Section ---
+            
             # Execute the request
             response = requests.request(method, url, **kwargs)
             
